@@ -1,0 +1,4 @@
+## 2024-05-18 - [Path Traversal in Electron local protocol & IPC]
+**Vulnerability:** A critical Path Traversal vulnerability existed in the Electron application. The custom `local://` protocol handler, and `save-note`, `delete-note`, and `export-note` IPC handlers merely checked if a path `startsWith` the target directory string without resolving `../` components. This allowed reading, deleting, or exporting arbitrary files on the local filesystem.
+**Learning:** `String.prototype.startsWith` is insufficient for validating file paths in Node.js because paths can contain `../`. Resolving paths first is essential.
+**Prevention:** Always use `path.resolve()` on untrusted file paths to normalize them before checking if they reside within an allowed directory structure, appending `path.sep` to the allowed directory to prevent directory name prefix spoofing.
