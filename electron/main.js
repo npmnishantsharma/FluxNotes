@@ -305,6 +305,13 @@ function fromLocalImageUrl(value) {
   return value.startsWith('local://') ? decodeURI(value.replace(/^local:\/\//, '')) : value;
 }
 
+function isSafeImagePath(filePath) {
+  if (!filePath) return false;
+  const resolvedPath = path.resolve(filePath);
+  const safeDir = path.resolve(imagesDir) + path.sep;
+  return resolvedPath.startsWith(safeDir);
+}
+
 function safeFileName(name) {
   return (name || 'notes').replace(/[<>:"/\\|?*\x00-\x1F]/g, '_').trim() || 'notes';
 }
@@ -443,7 +450,7 @@ ipcMain.handle('save-note', async (_, noteData) => {
   const savedImages = Array.isArray(noteData.images)
     ? noteData.images
       .map((imagePath) => typeof imagePath === 'string' ? fromLocalImageUrl(imagePath) : '')
-      .filter((imagePath) => imagePath.startsWith(imagesDir) && fs.existsSync(imagePath))
+      .filter((imagePath) => isSafeImagePath(imagePath) && fs.existsSync(imagePath))
       .map(toLocalImageUrl)
     : [];
 
@@ -501,7 +508,7 @@ ipcMain.handle('delete-note', async (_, topicId) => {
   )));
   const removableImagePaths = (noteToDelete.images || [])
     .map(fromLocalImageUrl)
-    .filter((imagePath) => imagePath.startsWith(imagesDir) && !remainingImagePaths.has(imagePath));
+    .filter((imagePath) => isSafeImagePath(imagePath) && !remainingImagePaths.has(imagePath));
 
   await Promise.all(removableImagePaths.map(async (imagePath) => {
     try {
@@ -521,7 +528,7 @@ ipcMain.handle('delete-note', async (_, topicId) => {
 ipcMain.handle('export-note', async (_, { images, topicName, format }) => {
   const imagePaths = Array.isArray(images)
     ? images.map((imagePath) => typeof imagePath === 'string' ? fromLocalImageUrl(imagePath) : '')
-      .filter((imagePath) => fs.existsSync(imagePath))
+      .filter((imagePath) => isSafeImagePath(imagePath) && fs.existsSync(imagePath))
     : [];
 
   if (imagePaths.length === 0) {
@@ -921,6 +928,13 @@ app.whenReady().then(() => {
     if (process.platform === 'win32' && decodedPath.startsWith('/')) {
       decodedPath = decodedPath.slice(1);
     }
+
+    if (!isSafeImagePath(decodedPath)) {
+      console.error("[ELECTRON] Blocked unsafe file access via local:// protocol:", decodedPath);
+      callback({ error: -2 }); // net::ERR_FAILED
+      return;
+    }
+
     callback({ path: decodedPath });
   });
 
