@@ -241,28 +241,40 @@ function getImageGenerationPayload(userText) {
 const dataFilePath = path.join(app.getPath('userData'), 'notes_data.json');
 const imagesDir = path.join(app.getPath('userData'), 'images');
 
+let memoryCache = null;
+
 if (!fs.existsSync(imagesDir)) {
   fs.mkdirSync(imagesDir, { recursive: true });
 }
 
 async function readDataFileAsync() {
+  // ⚡ Bolt: Return structured clone of memory cache to prevent unnecessary disk I/O
+  if (memoryCache) {
+    return structuredClone(memoryCache);
+  }
+
   try {
     if (fs.existsSync(dataFilePath)) {
       const rawData = await fs.promises.readFile(dataFilePath, 'utf-8');
       const parsed = JSON.parse(rawData);
-      return {
+      memoryCache = {
         notes_collection: Array.isArray(parsed.notes_collection) ? parsed.notes_collection : [],
         image_records: Array.isArray(parsed.image_records) ? parsed.image_records : []
       };
+      return structuredClone(memoryCache);
     }
   } catch (err) {
     console.error('Failed to read local JSON data file:', err);
   }
-  return { notes_collection: [], image_records: [] };
+
+  memoryCache = { notes_collection: [], image_records: [] };
+  return structuredClone(memoryCache);
 }
 
 async function writeDataFileAsync(data) {
   try {
+    // ⚡ Bolt: Update cache when writing to disk
+    memoryCache = structuredClone(data);
     await fs.promises.writeFile(dataFilePath, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
     console.error('Failed to write local JSON data file:', err);
