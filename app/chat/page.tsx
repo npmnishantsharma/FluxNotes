@@ -332,9 +332,9 @@ export default function NewChatPage() {
               <span className="mx-1 h-5 w-px bg-white/10" />
             </>
           )}
-          <button onClick={minimizeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition"><svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><path d="M0 0h10v1H0z" /></svg></button>
-          <button onClick={maximizeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"><rect x="0.5" y="0.5" width="9" height="9" /></svg></button>
-          <button onClick={closeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-red-600 text-slate-400 hover:text-white transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1.07 0L0 1.07l3.93 3.93L0 8.93 1.07 10l3.93-3.93L8.93 10 10 8.93 6.07 5 10 1.07 8.93 0 5 3.93 1.07 0z" /></svg></button>
+          <button onClick={minimizeWindow} aria-label="Minimize" title="Minimize" className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] focus-visible:bg-[#27272a] text-slate-400 hover:text-white focus-visible:text-white focus-visible:outline-none transition"><svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><path d="M0 0h10v1H0z" /></svg></button>
+          <button onClick={maximizeWindow} aria-label="Maximize" title="Maximize" className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] focus-visible:bg-[#27272a] text-slate-400 hover:text-white focus-visible:text-white focus-visible:outline-none transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"><rect x="0.5" y="0.5" width="9" height="9" /></svg></button>
+          <button onClick={closeWindow} aria-label="Close" title="Close" className="flex h-9 w-11 items-center justify-center hover:bg-red-600 focus-visible:bg-red-600 text-slate-400 hover:text-white focus-visible:text-white focus-visible:outline-none transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1.07 0L0 1.07l3.93 3.93L0 8.93 1.07 10l3.93-3.93L8.93 10 10 8.93 6.07 5 10 1.07 8.93 0 5 3.93 1.07 0z" /></svg></button>
         </div>
       </div>
 
