@@ -302,7 +302,23 @@ function toLocalImageUrl(filePath) {
 }
 
 function fromLocalImageUrl(value) {
-  return value.startsWith('local://') ? decodeURI(value.replace(/^local:\/\//, '')) : value;
+  if (typeof value !== 'string') return '';
+  if (!value.startsWith('local://')) return value;
+
+  const decoded = decodeURI(value.replace(/^local:\/\//, ''));
+  if (!decoded) return '';
+
+  try {
+    const resolvedPath = path.resolve(decoded);
+    const resolvedImagesDir = path.resolve(imagesDir);
+    if (!resolvedPath.startsWith(resolvedImagesDir + path.sep) && resolvedPath !== resolvedImagesDir) {
+      return '';
+    }
+    return resolvedPath;
+  } catch (err) {
+    console.error("Path traversal prevention error:", err);
+    return '';
+  }
 }
 
 function safeFileName(name) {
