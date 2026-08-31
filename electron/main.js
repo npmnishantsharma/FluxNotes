@@ -443,7 +443,12 @@ ipcMain.handle('save-note', async (_, noteData) => {
   const savedImages = Array.isArray(noteData.images)
     ? noteData.images
       .map((imagePath) => typeof imagePath === 'string' ? fromLocalImageUrl(imagePath) : '')
-      .filter((imagePath) => imagePath.startsWith(imagesDir) && fs.existsSync(imagePath))
+      .filter((imagePath) => {
+        // Prevent path traversal
+        const resolvedPath = path.resolve(imagePath);
+        const resolvedImagesDir = path.resolve(imagesDir) + path.sep;
+        return resolvedPath.startsWith(resolvedImagesDir) && fs.existsSync(resolvedPath);
+      })
       .map(toLocalImageUrl)
     : [];
 
@@ -501,7 +506,12 @@ ipcMain.handle('delete-note', async (_, topicId) => {
   )));
   const removableImagePaths = (noteToDelete.images || [])
     .map(fromLocalImageUrl)
-    .filter((imagePath) => imagePath.startsWith(imagesDir) && !remainingImagePaths.has(imagePath));
+    .filter((imagePath) => {
+      // Prevent path traversal
+      const resolvedPath = path.resolve(imagePath);
+      const resolvedImagesDir = path.resolve(imagesDir) + path.sep;
+      return resolvedPath.startsWith(resolvedImagesDir) && !remainingImagePaths.has(imagePath);
+    });
 
   await Promise.all(removableImagePaths.map(async (imagePath) => {
     try {
