@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 
 const isStartOrContinue = (text: string) => {
@@ -52,6 +52,11 @@ export default function NewChatPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   
+  // Optimization: Pre-compute a map of page images for O(1) lookup during rendering
+  const pageImagesMap = useMemo(() => {
+    return new Map(pageImages.map(img => [img.pageNumber, img]));
+  }, [pageImages]);
+
   const containerEndRef = useRef<HTMLDivElement | null>(null);
   const imageRefs = useRef<Record<number, HTMLImageElement | null>>({});
   const pageImagesRef = useRef<GeneratedPageImage[]>([]);
@@ -347,7 +352,7 @@ export default function NewChatPage() {
               // Map through total expected pages based on subTopics outline
               assistantData.subTopics.map((subTopic, idx) => {
                 const targetPageNum = Number(subTopic.pageNumber || idx + 1);
-                const existingImage = pageImages.find((p) => p.pageNumber === targetPageNum);
+                const existingImage = pageImagesMap.get(targetPageNum);
                 const isCurrentlyBuilding = currentlyGeneratingPage === targetPageNum;
 
                 if (existingImage) {
