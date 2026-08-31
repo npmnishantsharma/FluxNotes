@@ -1,0 +1,3 @@
+## 2024-05-18 - Accessible Electron Window Controls
+**Learning:** Custom Electron window controls (minimize, maximize, close) implemented as icon-only buttons require explicit `aria-label` and `title` attributes for screen reader support and tooltip text. Furthermore, they need distinct `focus-visible` states to be operable and visible for keyboard users navigating the app.
+**Action:** When implementing or updating custom window controls in an Electron app, always ensure they are fully accessible by adding appropriate `aria-label`, `title`, and keyboard focus styles (e.g., `focus-visible` classes in Tailwind).
