@@ -392,28 +392,45 @@ async function reloadAndTrackProgress() {
 const dataFilePath = path.join(app.getPath('userData'), 'notes_data.json');
 const imagesDir = path.join(app.getPath('userData'), 'images');
 
+// In-memory cache to prevent excessive disk reads/parses for IPC calls
+let __dataCache = null;
+
 if (!fs.existsSync(imagesDir)) {
   fs.mkdirSync(imagesDir, { recursive: true });
 }
 
 async function readDataFileAsync() {
+  // Return a cloned version of cache to prevent accidental shared-reference mutations
+  if (__dataCache) {
+    return structuredClone(__dataCache);
+  }
+
   try {
     if (fs.existsSync(dataFilePath)) {
       const rawData = await fs.promises.readFile(dataFilePath, 'utf-8');
       const parsed = JSON.parse(rawData);
-      return {
+      const data = {
         notes_collection: Array.isArray(parsed.notes_collection) ? parsed.notes_collection : [],
         image_records: Array.isArray(parsed.image_records) ? parsed.image_records : []
       };
+
+      // Update cache
+      __dataCache = structuredClone(data);
+      return data;
     }
   } catch (err) {
     console.error('Failed to read local JSON data file:', err);
   }
-  return { notes_collection: [], image_records: [] };
+
+  const defaultData = { notes_collection: [], image_records: [] };
+  __dataCache = structuredClone(defaultData);
+  return defaultData;
 }
 
 async function writeDataFileAsync(data) {
   try {
+    // Update cache concurrently with writing
+    __dataCache = structuredClone(data);
     await fs.promises.writeFile(dataFilePath, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
     console.error('Failed to write local JSON data file:', err);
