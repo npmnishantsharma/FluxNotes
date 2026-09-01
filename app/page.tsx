@@ -151,9 +151,9 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-1 -mr-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          <button onClick={minimizeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition"><svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><path d="M0 0h10v1H0z" /></svg></button>
-          <button onClick={maximizeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"><rect x="0.5" y="0.5" width="9" height="9" /></svg></button>
-          <button onClick={closeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-red-600 text-slate-400 hover:text-white transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1.07 0L0 1.07l3.93 3.93L0 8.93 1.07 10l3.93-3.93L8.93 10 10 8.93 6.07 5 10 1.07 8.93 0 5 3.93 1.07 0z" /></svg></button>
+          <button onClick={minimizeWindow} aria-label="Minimize window" title="Minimize" className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"><svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><path d="M0 0h10v1H0z" /></svg></button>
+          <button onClick={maximizeWindow} aria-label="Maximize window" title="Maximize" className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"><rect x="0.5" y="0.5" width="9" height="9" /></svg></button>
+          <button onClick={closeWindow} aria-label="Close window" title="Close" className="flex h-9 w-11 items-center justify-center hover:bg-red-600 text-slate-400 hover:text-white transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1.07 0L0 1.07l3.93 3.93L0 8.93 1.07 10l3.93-3.93L8.93 10 10 8.93 6.07 5 10 1.07 8.93 0 5 3.93 1.07 0z" /></svg></button>
         </div>
       </div>
 
@@ -226,7 +226,8 @@ export default function DashboardPage() {
                       <button
                         onClick={(event) => { event.stopPropagation(); setOpenMenuId((current) => current === note.topicId ? null : note.topicId); }}
                         aria-label={`More options for ${note.topicName || 'note'}`}
-                        className="flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-white/10 hover:text-white"
+                        title="More options"
+                        className="flex h-6 w-6 items-center justify-center rounded text-slate-400 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>
                       </button>

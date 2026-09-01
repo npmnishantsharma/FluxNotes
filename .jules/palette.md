@@ -1,0 +1,3 @@
+## 2024-05-23 - Accessibility for Electron Window Controls
+**Learning:** Custom window controls (Minimize, Maximize, Close) implemented in web technologies for Electron apps frequently miss basic accessibility features like `aria-label`, `title`, and keyboard focus indicators, making them difficult or impossible to use for screen reader and keyboard-only users.
+**Action:** Always add explicit `aria-label` and `title` attributes to icon-only buttons (such as custom Electron window controls), ensure full keyboard accessibility (e.g., using Tailwind `focus-visible` classes), and utilize existing classes rather than adding custom CSS.
