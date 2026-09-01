@@ -392,6 +392,13 @@ async function reloadAndTrackProgress() {
 const dataFilePath = path.join(app.getPath('userData'), 'notes_data.json');
 const imagesDir = path.join(app.getPath('userData'), 'images');
 
+// Security helper: Validate path prevents directory traversal
+function isSafePath(inputPath, baseDir) {
+  const resolvedPath = path.resolve(inputPath);
+  const resolvedBase = path.resolve(baseDir);
+  return resolvedPath.startsWith(resolvedBase + path.sep) || resolvedPath === resolvedBase;
+}
+
 if (!fs.existsSync(imagesDir)) {
   fs.mkdirSync(imagesDir, { recursive: true });
 }
@@ -625,7 +632,7 @@ ipcMain.handle('save-note', async (_, noteData) => {
   const savedImages = Array.isArray(noteData.images)
     ? noteData.images
       .map((imagePath) => typeof imagePath === 'string' ? fromLocalImageUrl(imagePath) : '')
-      .filter((imagePath) => imagePath.startsWith(imagesDir) && fs.existsSync(imagePath))
+      .filter((imagePath) => isSafePath(imagePath, imagesDir) && fs.existsSync(imagePath))
       .map(toLocalImageUrl)
     : [];
 
@@ -683,7 +690,7 @@ ipcMain.handle('delete-note', async (_, topicId) => {
   )));
   const removableImagePaths = (noteToDelete.images || [])
     .map(fromLocalImageUrl)
-    .filter((imagePath) => imagePath.startsWith(imagesDir) && !remainingImagePaths.has(imagePath));
+    .filter((imagePath) => isSafePath(imagePath, imagesDir) && !remainingImagePaths.has(imagePath));
 
   await Promise.all(removableImagePaths.map(async (imagePath) => {
     try {
@@ -1312,6 +1319,11 @@ app.whenReady().then(() => {
     let decodedPath = decodeURI(url);
     if (process.platform === 'win32' && decodedPath.startsWith('/')) {
       decodedPath = decodedPath.slice(1);
+    }
+    // Prevent arbitrary file reading by strictly validating path scope
+    if (!isSafePath(decodedPath, imagesDir)) {
+      console.warn(`[SECURITY] Blocked local file inclusion attempt: ${decodedPath}`);
+      return callback({ error: -2 }); // -2 is net::ERR_FAILED
     }
     callback({ path: decodedPath });
   });
