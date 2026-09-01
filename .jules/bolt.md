@@ -1,0 +1,3 @@
+## 2024-11-20 - [In-Memory Caching of Electron IPC JSON Data]
+**Learning:** By wrapping `readDataFileAsync` and `writeDataFileAsync` in an in-memory cache using `structuredClone()`, we can significantly reduce the disk I/O and JSON parsing overhead of frequently called Electron IPC methods (like `get-all-notes`), directly making the UI load data faster while safely preventing accidental shared-reference mutations across data lifecycles.
+**Action:** When implementing any further database/file-based read optimizations for Electron IPC data, leverage an isolated in-memory cache synchronized with disk writes.
