@@ -998,7 +998,17 @@ app.whenReady().then(() => {
     if (process.platform === 'win32' && decodedPath.startsWith('/')) {
       decodedPath = decodedPath.slice(1);
     }
-    callback({ path: decodedPath });
+
+    // Security enhancement: Prevent Local File Inclusion (LFI) by path traversal
+    const resolvedPath = path.resolve(decodedPath);
+    const intendedDir = path.resolve(imagesDir) + path.sep;
+
+    if (!resolvedPath.startsWith(intendedDir)) {
+      console.warn(`[SECURITY] Blocked path traversal attempt in custom protocol: ${resolvedPath}`);
+      return callback({ error: -2 }); // net::ERR_FAILED
+    }
+
+    callback({ path: resolvedPath });
   });
 
   createWindow();
