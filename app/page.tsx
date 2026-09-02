@@ -140,7 +140,8 @@ export default function DashboardPage() {
           {/* Updater status indicator / trigger button */}
           <button 
             onClick={checkForUpdates}
-            className="ml-3 text-[10px] bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-0.5 rounded text-slate-400 hover:text-white transition cursor-pointer"
+            disabled={updateStatus === 'checking' || updateStatus === 'downloading'}
+            className="ml-3 text-[10px] bg-white/5 hover:bg-white/10 border border-white/10 px-2 py-0.5 rounded text-slate-400 hover:text-white transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             title="Click to check for updates manually"
           >
             {updateStatus === 'checking' && 'Checking updates...'}
@@ -151,9 +152,9 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-1 -mr-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          <button onClick={minimizeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition"><svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><path d="M0 0h10v1H0z" /></svg></button>
-          <button onClick={maximizeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"><rect x="0.5" y="0.5" width="9" height="9" /></svg></button>
-          <button onClick={closeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-red-600 text-slate-400 hover:text-white transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1.07 0L0 1.07l3.93 3.93L0 8.93 1.07 10l3.93-3.93L8.93 10 10 8.93 6.07 5 10 1.07 8.93 0 5 3.93 1.07 0z" /></svg></button>
+          <button aria-label="Minimize" onClick={minimizeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition"><svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><path d="M0 0h10v1H0z" /></svg></button>
+          <button aria-label="Maximize" onClick={maximizeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"><rect x="0.5" y="0.5" width="9" height="9" /></svg></button>
+          <button aria-label="Close" onClick={closeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-red-600 text-slate-400 hover:text-white transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1.07 0L0 1.07l3.93 3.93L0 8.93 1.07 10l3.93-3.93L8.93 10 10 8.93 6.07 5 10 1.07 8.93 0 5 3.93 1.07 0z" /></svg></button>
         </div>
       </div>
 
