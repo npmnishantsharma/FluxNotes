@@ -234,15 +234,24 @@ if (!fs.existsSync(imagesDir)) {
   fs.mkdirSync(imagesDir, { recursive: true });
 }
 
+let cachedData = null;
+
 async function readDataFileAsync() {
+  if (cachedData) {
+    // ⚡ Bolt: Cache expensive local JSON reads.
+    // Memory constraint: Always use structuredClone() to isolate cached data and prevent shared reference mutations.
+    return structuredClone(cachedData);
+  }
+
   try {
     if (fs.existsSync(dataFilePath)) {
       const rawData = await fs.promises.readFile(dataFilePath, 'utf-8');
       const parsed = JSON.parse(rawData);
-      return {
+      cachedData = {
         notes_collection: Array.isArray(parsed.notes_collection) ? parsed.notes_collection : [],
         image_records: Array.isArray(parsed.image_records) ? parsed.image_records : []
       };
+      return structuredClone(cachedData);
     }
   } catch (err) {
     console.error('Failed to read local JSON data file:', err);
@@ -253,6 +262,9 @@ async function readDataFileAsync() {
 async function writeDataFileAsync(data) {
   try {
     await fs.promises.writeFile(dataFilePath, JSON.stringify(data, null, 2), 'utf-8');
+    // ⚡ Bolt: Update cache during write to maintain consistency without re-reading
+    // Placed after write to avoid out-of-sync cache if write fails.
+    cachedData = structuredClone(data);
   } catch (err) {
     console.error('Failed to write local JSON data file:', err);
   }
