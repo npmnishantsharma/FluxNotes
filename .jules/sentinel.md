@@ -1,0 +1,4 @@
+## 2024-05-15 - Prevent Local File Inclusion (LFI) in Electron Custom Protocol
+**Vulnerability:** The application used `protocol.registerFileProtocol('local', ...)` to serve local images, but it took the requested URL and served the file without resolving and validating that the file actually resides within the intended `imagesDir`. An attacker could exploit this by providing a path like `local://../../../../etc/passwd` to read arbitrary files from the filesystem.
+**Learning:** `protocol.registerFileProtocol` is inherently risky when serving dynamically requested files if the input path is not strictly validated against a known safe directory.
+**Prevention:** Always fully resolve the user-provided path using `path.resolve()` and verify that it strictly starts with the fully resolved intended base directory (including the trailing path separator, e.g., `path.sep`) before returning the path to the protocol callback.
