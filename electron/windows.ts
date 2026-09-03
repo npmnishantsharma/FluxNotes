@@ -11,6 +11,7 @@ export const forceAllowDevTools = args.includes('--allow-dev-tools');
 
 export const PROVIDER_STORAGE_KEY = 'fluxnotes-ai-provider';
 export const CHATGPT_URL = 'https://chatgpt.com/';
+export const CHATGPT_LOGIN_URL = 'https://chatgpt.com/auth/login/';
 export const GEMINI_SIGN_IN_URL = 'https://gemini.google.com/signin';
 
 let mainWindow: BrowserWindow | null = null;
@@ -148,45 +149,64 @@ export function startLoginCheckRoutine(resetSessionCallback: () => void): void {
         return;
       }
 
-      const isOnProviderPage = provider === 'gemini'
-        ? isGeminiUrl(currentUrl)
-        : isChatGptUrl(currentUrl);
+      if (provider === 'gemini') {
+        if (!isGeminiUrl(currentUrl)) {
+          await sendWorkerWindow.loadURL(GEMINI_SIGN_IN_URL);
+          return;
+        }
 
-      if (!isOnProviderPage) {
-        await sendWorkerWindow.loadURL(provider === 'gemini' ? GEMINI_SIGN_IN_URL : CHATGPT_URL);
-        return;
-      }
-
-      const hasLoginText = provider === 'gemini'
-        ? await sendWorkerWindow.webContents.executeJavaScript(`
+        const hasGeminiLoginText = await sendWorkerWindow.webContents.executeJavaScript(`
           (function() {
             const bodyText = document.body ? document.body.innerText : "";
             return /Meet Gemini, your personal AI assistant/i.test(bodyText);
           })();
-        `)
-        : await sendWorkerWindow.webContents.executeJavaScript(`
-          (function() {
-            const bodyText = document.body ? document.body.innerText : "";
-            return bodyText.includes("Log in") || bodyText.includes("Sign up");
-          })();
         `);
-      if (hasLoginText) {
-        if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
-          console.log('[ELECTRON] Hiding main window due to login page detection.');
-          mainWindow.hide();
-        }
-        if (sendWorkerWindow && !sendWorkerWindow.isVisible()) {
-          console.log('[ELECTRON] Showing send worker window for login.');
-          sendWorkerWindow.show();
-          sendWorkerWindow.focus();
+
+        if (hasGeminiLoginText) {
+          if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+            mainWindow.hide();
+          }
+          if (sendWorkerWindow && !sendWorkerWindow.isVisible()) {
+            sendWorkerWindow.show();
+            sendWorkerWindow.focus();
+          }
+        } else {
+          if (sendWorkerWindow && !sendWorkerWindow.isDestroyed() && sendWorkerWindow.isVisible()) {
+            sendWorkerWindow.hide();
+          }
+          if (mainWindow && !mainWindow.isVisible()) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
         }
       } else {
-        if (sendWorkerWindow && !sendWorkerWindow.isDestroyed() && sendWorkerWindow.isVisible()) {
-          sendWorkerWindow.hide();
+        // ChatGPT login detection:
+        // If on /auth/login/ or auth subpath, user is not logged in.
+        // If redirected away to chatgpt.com (non-auth), user is logged in.
+        const isOnAuthPage = currentUrl.includes('/auth/login') || currentUrl.includes('/auth/');
+        if (!isChatGptUrl(currentUrl)) {
+          await sendWorkerWindow.loadURL(CHATGPT_LOGIN_URL);
+          return;
         }
-        if (mainWindow && !mainWindow.isVisible()) {
-          mainWindow.show();
-          mainWindow.focus();
+
+        if (isOnAuthPage) {
+          if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
+            console.log('[ELECTRON] Hiding main window due to ChatGPT login page detection.');
+            mainWindow.hide();
+          }
+          if (sendWorkerWindow && !sendWorkerWindow.isVisible()) {
+            console.log('[ELECTRON] Showing send worker window for ChatGPT login.');
+            sendWorkerWindow.show();
+            sendWorkerWindow.focus();
+          }
+        } else {
+          if (sendWorkerWindow && !sendWorkerWindow.isDestroyed() && sendWorkerWindow.isVisible()) {
+            sendWorkerWindow.hide();
+          }
+          if (mainWindow && !mainWindow.isVisible()) {
+            mainWindow.show();
+            mainWindow.focus();
+          }
         }
       }
     } catch {
@@ -275,7 +295,7 @@ export async function createWindows(resetSessionCallback: () => void): Promise<v
   const workerUrl = selectedProvider === 'gemini'
     ? GEMINI_SIGN_IN_URL
     : selectedProvider === 'chatgpt'
-      ? CHATGPT_URL
+      ? CHATGPT_LOGIN_URL
       : 'about:blank';
   await sendWorkerWindow.loadURL(workerUrl);
 
