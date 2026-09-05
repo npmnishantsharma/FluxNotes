@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   close: () => ipcRenderer.send('window-close'),
   startNewChat: () => ipcRenderer.invoke('start-new-chat'),
   setNoteChatSession: (chat: { chatUrl?: string; sessionId?: string; session?: unknown }) => ipcRenderer.invoke('set-note-chat-session', chat),
-  fillChatGptInput: (text: string) => ipcRenderer.invoke('fill-chatgpt-input', text),
+  fillChatGptInput: (text: string, attachments?: { base64: string; filename: string; mimeType: string; fileSize: number }[] | null) => ipcRenderer.invoke('fill-chatgpt-input', text, attachments),
   getStoredImages: () => ipcRenderer.invoke('get-stored-images'),
   getAllNotes: () => ipcRenderer.invoke('get-all-notes'),
   getNoteById: (topicId: string) => ipcRenderer.invoke('get-note-by-id', topicId),
@@ -31,4 +31,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('updater-event', (_event, data) => callback(data));
   },
   saveRawResult: (data: { sessionId?: string; rawContent: string; conversationId?: string }) => ipcRenderer.invoke('save-raw-result', data),
+  getNgrokSettings: () => ipcRenderer.invoke('get-ngrok-settings'),
+  configureNgrok: (token: string, port: number, domain: string) => ipcRenderer.invoke('configure-ngrok', token, port, domain),
 });

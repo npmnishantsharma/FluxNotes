@@ -12,6 +12,8 @@ import { registerNotesIpcHandlers } from './ipc/notes';
 import { registerUpdaterHandlers } from './ipc/updater';
 import { processAiPrompt } from './ai';
 import { AIProvider, ChatSession } from './types';
+import { configureNgrok, getNgrokSettings, startNgrok, stopNgrok } from './ngrok';
+import { startApiServer, stopApiServer } from './api';
 
 const sessionState: {
   pendingChatUrl: string | null;
@@ -35,8 +37,23 @@ function resetSessionState(): void {
 
 ensureDirectoriesExist();
 
+ipcMain.handle('get-ngrok-settings', () => getNgrokSettings());
+ipcMain.handle('configure-ngrok', async (_event, token: string, port: number, domain: string) => {
+  try {
+    await configureNgrok(token, port, domain);
+    return { success: true, ...(await getNgrokSettings()) };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+
 // --- AI Prompt Execution Handlers ---
-ipcMain.handle('fill-chatgpt-input', async (_event, userText: string) => {
+ipcMain.handle('fill-chatgpt-input', async (_event, userText: string, attachments?: {
+  base64: string;
+  filename: string;
+  mimeType: string;
+  fileSize: number;
+}[] | null) => {
   const workerWindow = getWorkerWindow();
   const mainWindow = getMainWindow();
   if (!workerWindow) return false;
@@ -52,6 +69,7 @@ ipcMain.handle('fill-chatgpt-input', async (_event, userText: string) => {
       sessionState.activeChatSessionId,
       sessionState.activeChatSession,
       sessionState.isGeminiSessionInitialized,
+      attachments,
     );
 
     sessionState.activeChatSessionId = newSessionId;
@@ -72,7 +90,14 @@ ipcMain.handle('fill-chatgpt-input', async (_event, userText: string) => {
 });
 
 // --- Protocol & App Initialization ---
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  try {
+    await startApiServer();
+    await startNgrok();
+  } catch (error) {
+    console.error('[ngrok] Could not start:', error);
+  }
+
   protocol.registerFileProtocol('local', (request, callback) => {
     const url = request.url.replace(/^local:\/\//, '');
     let decodedPath = decodeURI(url);
@@ -91,4 +116,9 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  void stopApiServer();
+  void stopNgrok();
 });

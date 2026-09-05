@@ -10,7 +10,7 @@ const helpers_1 = require("../utils/helpers");
 const storage_1 = require("../utils/storage");
 const gemini_1 = require("./gemini");
 const chatgpt_1 = require("./chatgpt");
-async function processAiPrompt(workerWindow, mainWindow, userText, provider, activeSessionId, activeSession, isGeminiSessionInitialized) {
+async function processAiPrompt(workerWindow, mainWindow, userText, provider, activeSessionId, activeSession, isGeminiSessionInitialized, attachments) {
     const sessionId = activeSessionId || (0, helpers_1.createChatSessionId)();
     let session = activeSession || { conversationId: null, parentMessageId: null };
     let geminiInitialized = isGeminiSessionInitialized;
@@ -27,16 +27,16 @@ async function processAiPrompt(workerWindow, mainWindow, userText, provider, act
     let result = null;
     if (provider === 'gemini') {
         await (0, gemini_1.injectGeminiEngineIfNeeded)(workerWindow);
-      const geminiPromptContent = promptContent.replace(/### Your Image Response[\s\S]*?(?=### Info On Image Generation)/, '');
-      const isGeminiImageCommand = (() => {
-        try {
-          const parsed = JSON.parse(userText);
-          return parsed.status === 'start' || parsed.status === 'continue';
-        }
-        catch {
-          return /["']?status["']?\s*:\s*["'](?:start|continue)["']/i.test(userText);
-        }
-      })();
+        const geminiPromptContent = promptContent.replace(/### Your Image Response[\s\S]*?(?=### Info On Image Generation)/, '');
+        const isGeminiImageCommand = (() => {
+            try {
+                const parsed = JSON.parse(userText);
+                return parsed.status === 'start' || parsed.status === 'continue';
+            }
+            catch {
+                return /["']?status["']?\s*:\s*["'](?:start|continue)["']/i.test(userText);
+            }
+        })();
         const geminiResult = await workerWindow.webContents.executeJavaScript(`
       (async function() {
         if (!window.__fluxnotesGeminiUnified) {
@@ -53,8 +53,8 @@ async function processAiPrompt(workerWindow, mainWindow, userText, provider, act
     `);
         geminiInitialized = true;
         const downloadedGeminiImages = isGeminiImageCommand
-          ? await (0, gemini_1.downloadGeminiImages)(geminiResult?.rawText || '')
-          : [];
+            ? await (0, gemini_1.downloadGeminiImages)(geminiResult?.rawText || '')
+            : [];
         result = {
             rawText: geminiResult?.rawText || '',
             conversationId: null,
@@ -78,6 +78,7 @@ async function processAiPrompt(workerWindow, mainWindow, userText, provider, act
         const usrText = ${JSON.stringify(userText)};
         const sessionId = ${JSON.stringify(sessionId)};
         const session = ${JSON.stringify(session)};
+        const uploadedAttachments = ${JSON.stringify(attachments || [])};
         window.__fluxnotesChatGPT.setSession(sessionId, session);
 
         const currentConvoId = window.__fluxnotesChatGPT.getConversationId(sessionId);
@@ -88,8 +89,23 @@ async function processAiPrompt(workerWindow, mainWindow, userText, provider, act
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
+        const messageAttachments = [];
+        for (const uploadedAttachment of uploadedAttachments) {
+          const fileId = await window.__fluxnotesChatGPT.uploadFileToChatGPT(
+            uploadedAttachment.base64,
+            uploadedAttachment.filename,
+            uploadedAttachment.mimeType,
+          );
+          messageAttachments.push({
+            imageToken: fileId,
+            mimeType: uploadedAttachment.mimeType,
+            fileSize: uploadedAttachment.fileSize,
+            filename: uploadedAttachment.filename,
+          });
+        }
+
         console.log("[INJECTION] Sending user query to the same conversation thread...");
-        let finalOutput = await window.__fluxnotesChatGPT.send(usrText, 'chatgpt', null, sessionId);
+        let finalOutput = await window.__fluxnotesChatGPT.send(usrText, 'chatgpt', messageAttachments, sessionId);
         const finalText = String(finalOutput && finalOutput.text ? finalOutput.text : "").trim();
 
         if (!finalText) {

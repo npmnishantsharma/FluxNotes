@@ -45,6 +45,41 @@ function formatElapsed(ms: number) {
   return `${seconds}s`;
 }
 
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getFileKind(mimeType: string, filename: string) {
+  const extension = filename.split('.').pop()?.toLowerCase() || '';
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  if (mimeType === 'application/pdf' || extension === 'pdf') return 'pdf';
+  if (mimeType.includes('spreadsheet') || ['csv', 'xls', 'xlsx'].includes(extension)) return 'spreadsheet';
+  if (mimeType.includes('zip') || mimeType.includes('compressed') || ['7z', 'rar', 'tar', 'gz', 'zip'].includes(extension)) return 'archive';
+  if (mimeType.includes('json') || mimeType.includes('javascript') || mimeType.includes('text/')) return 'code';
+  if (mimeType.includes('word') || mimeType.includes('document') || ['doc', 'docx', 'rtf'].includes(extension)) return 'document';
+  return 'file';
+}
+
+function FileTypeIcon({ kind }: { kind: string }) {
+  const colors: Record<string, string> = {
+    pdf: 'text-red-300', document: 'text-blue-300', spreadsheet: 'text-emerald-300',
+    archive: 'text-amber-300', code: 'text-cyan-300', audio: 'text-pink-300',
+    video: 'text-violet-300', file: 'text-slate-300',
+  };
+  if (kind === 'image') return null;
+  return (
+    <svg width="28" height="32" viewBox="0 0 24 28" fill="none" className={colors[kind] || colors.file} aria-hidden="true">
+      <path d="M4 1.5h10l5 5V26.5H4z" fill="currentColor" fillOpacity=".12" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M14 1.5v5h5" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M7 15h9M7 18.5h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function TypingGenerationText({ active, pageNumber }: { active: boolean; pageNumber: number }) {
   const [text, setText] = useState('');
   const [phraseIndex, setPhraseIndex] = useState(0);
@@ -134,13 +169,24 @@ export default function NewChatPage() {
   const [failedPages, setFailedPages] = useState<Record<number, string>>({});
   const [nowMs, setTickNow] = useState<number>(() => Date.now());
   const [provider, setProvider] = useState<'chatgpt' | 'gemini'>('chatgpt');
+  const [selectedFiles, setSelectedFiles] = useState<ChatAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const pageTitle = assistantData?.topicName?.trim() || 'New Chat';
 
   const containerEndRef = useRef<HTMLDivElement | null>(null);
+  const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
   const imageRefs = useRef<Record<number, HTMLImageElement | null>>({});
   const pageImagesRef = useRef<GeneratedPageImage[]>([]);
   const chatSessionRef = useRef<{ sessionId?: string; session?: AssistantData['chatSession']; chatUrl?: string }>({});
   const startedNewChatRef = useRef(false);
+
+  useEffect(() => {
+    const textarea = promptInputRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > 180 ? 'auto' : 'hidden';
+  }, [inputText]);
 
   useEffect(() => {
     document.title = pageTitle;
@@ -256,7 +302,7 @@ export default function NewChatPage() {
     return () => { isCurrent = false; };
   }, []);
 
-  const sendPrompt = useCallback(async (promptText: string) => {
+  const sendPrompt = useCallback(async (promptText: string, attachments = selectedFiles) => {
     if (!promptText.trim() || isProcessing) return;
 
     setInputText('');
@@ -343,7 +389,7 @@ export default function NewChatPage() {
         }
 
       } else {
-        const responseData = await window.electronAPI?.fillChatGptInput(promptText);
+        const responseData = await window.electronAPI?.fillChatGptInput(promptText, attachments);
         
         if (responseData && typeof responseData === 'object' && !responseData.error) {
           chatSessionRef.current = {
@@ -369,10 +415,49 @@ export default function NewChatPage() {
       setGenerationProgress(null);
       setCurrentlyGeneratingPage(null);
     }
-  }, [isProcessing, assistantData]);
+    if (attachments === selectedFiles) setSelectedFiles([]);
+  }, [isProcessing, assistantData, selectedFiles]);
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    setAttachmentError(null);
+    if (files.length === 0) return;
+
+    const availableSlots = Math.max(0, 10 - selectedFiles.length);
+    const filesToRead = files.slice(0, availableSlots);
+    if (files.length > availableSlots) {
+      setAttachmentError('You can attach up to 10 files.');
+    }
+    if (filesToRead.length === 0) return;
+
+    const readFile = (file: File) => new Promise<ChatAttachment>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = typeof reader.result === 'string' ? reader.result : '';
+        const separator = result.indexOf(',');
+        if (separator === -1) {
+          reject(new Error(`Could not read ${file.name}.`));
+          return;
+        }
+        resolve({
+          base64: result.slice(separator + 1),
+          filename: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+        });
+      };
+      reader.onerror = () => reject(new Error(`Could not read ${file.name}.`));
+      reader.readAsDataURL(file);
+    });
+
+    void Promise.all(filesToRead.map(readFile))
+      .then((attachments) => setSelectedFiles((current) => [...current, ...attachments].slice(0, 10)))
+      .catch((error: Error) => setAttachmentError(error.message));
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       sendPrompt(inputText);
     }
@@ -395,6 +480,8 @@ export default function NewChatPage() {
     if (nextProvider === provider) return;
     window.localStorage.setItem(PROVIDER_STORAGE_KEY, nextProvider);
     setProvider(nextProvider);
+    setSelectedFiles([]);
+    setAttachmentError(null);
   };
 
   const exportNotes = async () => {
@@ -799,15 +886,43 @@ export default function NewChatPage() {
               <div className="absolute -inset-1 rounded-full bg-teal-500/15 blur-2xl transition-all duration-300 pointer-events-none" />
               <div className="absolute -inset-2 rounded-full bg-cyan-400/10 blur-[30px] transition-all duration-300 pointer-events-none" />
               
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={isProcessing}
-                placeholder={isProcessing ? `Responding ...` : "Type your prompt to generate your notes"}
-                className="w-full relative rounded-full border border-teal-500/30 bg-[#111217]/80 backdrop-blur-xl px-6 py-4 text-sm text-white shadow-2xl transition placeholder-slate-400 focus:outline-none focus:border-cyan-400/50 disabled:opacity-90 disabled:cursor-not-allowed"
-              />
+              {selectedFiles.length > 0 && (
+                <div className="mb-2 flex max-h-36 flex-wrap gap-2 overflow-y-auto rounded-lg border border-teal-500/30 bg-[#111217]/90 p-2 shadow-lg">
+                  {selectedFiles.map((file, index) => (
+                    <div key={`${file.filename}-${index}`} className="relative flex min-w-44 max-w-60 items-center gap-2 overflow-hidden rounded-md border border-white/10 bg-white/5 p-2" title={file.filename}>
+                      {file.mimeType.startsWith('image/') ? (
+                        <img src={`data:${file.mimeType};base64,${file.base64}`} alt={file.filename} className="h-10 w-10 shrink-0 rounded object-cover" />
+                      ) : (
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-black/20"><FileTypeIcon kind={getFileKind(file.mimeType, file.filename)} /></span>
+                      )}
+                      <span className="min-w-0 pr-4">
+                        <span className="block truncate text-xs font-medium text-slate-200">{file.filename}</span>
+                        <span className="block text-[10px] uppercase tracking-wide text-slate-500">{getFileKind(file.mimeType, file.filename)} · {formatFileSize(file.fileSize)}</span>
+                      </span>
+                      <button type="button" onClick={() => setSelectedFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))} className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[11px] text-white" aria-label={`Remove ${file.filename}`}>x</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {attachmentError && <p className="mb-2 text-center text-xs text-red-300">{attachmentError}</p>}
+              <div className="relative flex items-end rounded-xl border border-teal-500/30 bg-[#111217]/80 pr-2 shadow-2xl backdrop-blur-xl focus-within:border-cyan-400/50">
+                {provider === 'chatgpt' && (
+                  <>
+                    <input id="chat-attachment" type="file" multiple onChange={handleFileChange} disabled={isProcessing || selectedFiles.length >= 10} className="sr-only" />
+                    <label htmlFor="chat-attachment" title="Attach file" aria-label="Attach file" className="mb-2 ml-2 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-xl leading-none text-teal-200 transition hover:bg-white/10">+</label>
+                  </>
+                )}
+                <textarea
+                  ref={promptInputRef}
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  rows={1}
+                  disabled={isProcessing}
+                  placeholder={isProcessing ? `Responding ...` : "Type your prompt to generate your notes"}
+                  className="relative min-h-14 min-w-0 flex-1 resize-none rounded-xl bg-transparent px-4 py-4 text-sm leading-6 text-white outline-none placeholder-slate-400 disabled:cursor-not-allowed disabled:opacity-90"
+                />
+              </div>
               {exportMessage && (
                 <p className="mt-2 text-center text-xs text-teal-300">{exportMessage}</p>
               )}

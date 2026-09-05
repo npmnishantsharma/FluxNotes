@@ -118,6 +118,8 @@ export default function DashboardPage() {
   const maximizeWindow = () => window.electronAPI?.maximize();
   const closeWindow = () => window.electronAPI?.close();
 
+  const openSettings = () => router.push('/settings');
+
   const changeProvider = (nextProvider: 'chatgpt' | 'gemini') => {
     if (nextProvider === provider) return;
     window.localStorage.setItem(PROVIDER_STORAGE_KEY, nextProvider);
@@ -187,6 +189,9 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-1 -mr-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <button onClick={openSettings} aria-label="Open settings" title="Settings" className="flex h-9 w-11 items-center justify-center text-slate-400 hover:bg-[#27272a] hover:text-white transition">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" /><path d="m19.4 15 .1.1a2 2 0 1 1-2.8 2.8l-.1-.1a2 2 0 0 0-3.4 1.4V19a2 2 0 1 1-4 0v-.1a2 2 0 0 0-3.4-1.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A2 2 0 0 0 1.6 11H1.5a2 2 0 1 1 0-4h.1A2 2 0 0 0 3 3.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A2 2 0 0 0 9.2 1.5V1.4a2 2 0 1 1 4 0v.1a2 2 0 0 0 3.4 1.4l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A2 2 0 0 0 20.8 7h.1a2 2 0 1 1 0 4h-.1a2 2 0 0 0-1.4 3.4Z" /></svg>
+          </button>
           <button onClick={minimizeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition"><svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><path d="M0 0h10v1H0z" /></svg></button>
           <button onClick={maximizeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-[#27272a] text-slate-400 hover:text-white transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"><rect x="0.5" y="0.5" width="9" height="9" /></svg></button>
           <button onClick={closeWindow} className="flex h-9 w-11 items-center justify-center hover:bg-red-600 text-slate-400 hover:text-white transition"><svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1.07 0L0 1.07l3.93 3.93L0 8.93 1.07 10l3.93-3.93L8.93 10 10 8.93 6.07 5 10 1.07 8.93 0 5 3.93 1.07 0z" /></svg></button>

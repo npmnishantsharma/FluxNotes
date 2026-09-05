@@ -7,7 +7,7 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     close: () => electron_1.ipcRenderer.send('window-close'),
     startNewChat: () => electron_1.ipcRenderer.invoke('start-new-chat'),
     setNoteChatSession: (chat) => electron_1.ipcRenderer.invoke('set-note-chat-session', chat),
-    fillChatGptInput: (text) => electron_1.ipcRenderer.invoke('fill-chatgpt-input', text),
+    fillChatGptInput: (text, attachments) => electron_1.ipcRenderer.invoke('fill-chatgpt-input', text, attachments),
     getStoredImages: () => electron_1.ipcRenderer.invoke('get-stored-images'),
     getAllNotes: () => electron_1.ipcRenderer.invoke('get-all-notes'),
     getNoteById: (topicId) => electron_1.ipcRenderer.invoke('get-note-by-id', topicId),
@@ -31,4 +31,6 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
         electron_1.ipcRenderer.on('updater-event', (_event, data) => callback(data));
     },
     saveRawResult: (data) => electron_1.ipcRenderer.invoke('save-raw-result', data),
+    getNgrokSettings: () => electron_1.ipcRenderer.invoke('get-ngrok-settings'),
+    configureNgrok: (token, port, domain) => electron_1.ipcRenderer.invoke('configure-ngrok', token, port, domain),
 });

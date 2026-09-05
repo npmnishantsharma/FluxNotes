@@ -121,7 +121,7 @@ export function startLoginCheckRoutine(resetSessionCallback: () => void): void {
 
       if (!provider) {
         if (sendWorkerWindow.isVisible()) sendWorkerWindow.hide();
-        if (mainWindow && !mainWindow.isVisible()) {
+          if (mainWindow && !mainWindow.isVisible() && !mainWindow.isMinimized()) {
           mainWindow.show();
           mainWindow.focus();
         }
@@ -185,7 +185,7 @@ export function startLoginCheckRoutine(resetSessionCallback: () => void): void {
         if (sendWorkerWindow && !sendWorkerWindow.isDestroyed() && sendWorkerWindow.isVisible()) {
           sendWorkerWindow.hide();
         }
-        if (mainWindow && !mainWindow.isVisible()) {
+        if (mainWindow && !mainWindow.isVisible() && !mainWindow.isMinimized()) {
           mainWindow.show();
           mainWindow.focus();
         }
@@ -202,7 +202,16 @@ export function registerWindowControlListeners(): void {
     if (mainWindow?.isMaximized()) mainWindow.unmaximize();
     else mainWindow?.maximize();
   });
-  ipcMain.on('window-close', () => mainWindow?.close());
+  ipcMain.on('window-close', () => {
+    if (loginCheckInterval) {
+      clearInterval(loginCheckInterval);
+      loginCheckInterval = null;
+    }
+    if (sendWorkerWindow && !sendWorkerWindow.isDestroyed()) {
+      sendWorkerWindow.destroy();
+    }
+    app.quit();
+  });
 }
 
 export async function createWindows(resetSessionCallback: () => void): Promise<void> {

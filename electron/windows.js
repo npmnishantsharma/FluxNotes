@@ -132,7 +132,7 @@ function startLoginCheckRoutine(resetSessionCallback) {
             if (!provider) {
                 if (sendWorkerWindow.isVisible())
                     sendWorkerWindow.hide();
-                if (mainWindow && !mainWindow.isVisible()) {
+                if (mainWindow && !mainWindow.isVisible() && !mainWindow.isMinimized()) {
                     mainWindow.show();
                     mainWindow.focus();
                 }
@@ -191,7 +191,7 @@ function startLoginCheckRoutine(resetSessionCallback) {
                 if (sendWorkerWindow && !sendWorkerWindow.isDestroyed() && sendWorkerWindow.isVisible()) {
                     sendWorkerWindow.hide();
                 }
-                if (mainWindow && !mainWindow.isVisible()) {
+                if (mainWindow && !mainWindow.isVisible() && !mainWindow.isMinimized()) {
                     mainWindow.show();
                     mainWindow.focus();
                 }
@@ -210,7 +210,16 @@ function registerWindowControlListeners() {
         else
             mainWindow?.maximize();
     });
-    electron_1.ipcMain.on('window-close', () => mainWindow?.close());
+    electron_1.ipcMain.on('window-close', () => {
+        if (loginCheckInterval) {
+            clearInterval(loginCheckInterval);
+            loginCheckInterval = null;
+        }
+        if (sendWorkerWindow && !sendWorkerWindow.isDestroyed()) {
+            sendWorkerWindow.destroy();
+        }
+        electron_1.app.quit();
+    });
 }
 async function createWindows(resetSessionCallback) {
     const appIconPath = path_1.default.join(__dirname, '../icons/favicon.png');

@@ -638,39 +638,39 @@
     var messageContent;
     var messageMetadata = {};
 
-    if (attachments && attachments.imageToken) {
-      var fileId = attachments.imageToken;
-      var mimeType = attachments.mimeType || "image/png";
-      var fileSize = attachments.fileSize || 0;
-      var isImage = mimeType.startsWith("image/");
+    var attachmentList = Array.isArray(attachments)
+      ? attachments
+      : attachments
+        ? [attachments]
+        : [];
 
-      if (isImage) {
-        messageContent = {
-          content_type: "multimodal_text",
-          parts: [
-            message,
-            {
+    if (attachmentList.length > 0) {
+      var attachmentParts = [message];
+      for (var attachmentIndex = 0; attachmentIndex < attachmentList.length; attachmentIndex++) {
+        var attachment = attachmentList[attachmentIndex];
+        if (!attachment || !attachment.imageToken) continue;
+        var fileId = attachment.imageToken;
+        var mimeType = attachment.mimeType || "application/octet-stream";
+        var fileSize = attachment.fileSize || 0;
+        var isImage = mimeType.startsWith("image/");
+        attachmentParts.push(isImage
+          ? {
               content_type: "image_asset_pointer",
               asset_pointer: "file-service://" + fileId,
               size_bytes: fileSize,
               width: 500,
               height: 500,
-            },
-          ],
-        };
-      } else {
-        messageContent = {
-          content_type: "multimodal_text",
-          parts: [
-            message,
-            {
+            }
+          : {
               content_type: "file_asset_pointer",
               asset_pointer: "file-service://" + fileId,
               size_bytes: fileSize,
-            },
-          ],
-        };
+            });
       }
+      messageContent = {
+        content_type: "multimodal_text",
+        parts: attachmentParts,
+      };
       messageMetadata = {};
     } else {
       messageContent = {

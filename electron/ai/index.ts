@@ -15,6 +15,12 @@ export async function processAiPrompt(
   activeSessionId: string | null,
   activeSession: ChatSession | null,
   isGeminiSessionInitialized: boolean,
+  attachments?: {
+    base64: string;
+    filename: string;
+    mimeType: string;
+    fileSize: number;
+  }[] | null,
 ): Promise<{
   resultPayload: unknown;
   newSessionId: string;
@@ -94,6 +100,7 @@ export async function processAiPrompt(
         const usrText = ${JSON.stringify(userText)};
         const sessionId = ${JSON.stringify(sessionId)};
         const session = ${JSON.stringify(session)};
+        const uploadedAttachments = ${JSON.stringify(attachments || [])};
         window.__fluxnotesChatGPT.setSession(sessionId, session);
 
         const currentConvoId = window.__fluxnotesChatGPT.getConversationId(sessionId);
@@ -104,8 +111,23 @@ export async function processAiPrompt(
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
+        const messageAttachments = [];
+        for (const uploadedAttachment of uploadedAttachments) {
+          const fileId = await window.__fluxnotesChatGPT.uploadFileToChatGPT(
+            uploadedAttachment.base64,
+            uploadedAttachment.filename,
+            uploadedAttachment.mimeType,
+          );
+          messageAttachments.push({
+            imageToken: fileId,
+            mimeType: uploadedAttachment.mimeType,
+            fileSize: uploadedAttachment.fileSize,
+            filename: uploadedAttachment.filename,
+          });
+        }
+
         console.log("[INJECTION] Sending user query to the same conversation thread...");
-        let finalOutput = await window.__fluxnotesChatGPT.send(usrText, 'chatgpt', null, sessionId);
+        let finalOutput = await window.__fluxnotesChatGPT.send(usrText, 'chatgpt', messageAttachments, sessionId);
         const finalText = String(finalOutput && finalOutput.text ? finalOutput.text : "").trim();
 
         if (!finalText) {

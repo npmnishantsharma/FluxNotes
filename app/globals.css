@@ -44,3 +44,60 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.35);
 }
+
+.settings-input {
+  width: 100%;
+  height: 2.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.375rem;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0 0.75rem;
+  color: white;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.settings-input:focus {
+  border-color: rgba(45, 212, 191, 0.6);
+}
+
+.settings-primary,
+.settings-danger {
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.settings-primary {
+  background: #5eead4;
+  color: #071313;
+}
+
+.settings-primary:hover {
+  background: #99f6e4;
+}
+
+.settings-danger {
+  color: #fda4af;
+}
+
+.settings-danger:hover {
+  background: rgba(244, 63, 94, 0.1);
+}
+
+.window-control {
+  display: flex;
+  height: 2.25rem;
+  width: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.window-control:hover {
+  background: #27272a;
+  color: white;
+}

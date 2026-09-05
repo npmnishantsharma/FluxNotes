@@ -2,6 +2,13 @@
 export {};
 
 declare global {
+  type ChatAttachment = {
+    base64: string;
+    filename: string;
+    mimeType: string;
+    fileSize: number;
+  };
+
   interface Window {
     electronAPI?: {
       minimize: () => void;
@@ -9,7 +16,7 @@ declare global {
       close: () => void;
       startNewChat: () => Promise<{ sessionId: string }>;
       setNoteChatSession: (chat: { chatUrl?: string; sessionId?: string; session?: { conversationId?: string | null; parentMessageId?: string | null } | null }) => Promise<boolean>;
-      fillChatGptInput: (text: string) => Promise<any>;
+      fillChatGptInput: (text: string, attachments?: ChatAttachment[] | null) => Promise<any>;
       getStoredImages: () => Promise<string[]>;
       getAllNotes: () => Promise<any[]>;
       getNoteById: (topicId: string) => Promise<any>;
@@ -29,6 +36,8 @@ declare global {
       checkForUpdates: () => Promise<any>;
       restartAndInstall: () => void;
       onUpdaterEvent: (callback: (data: { type: string; info?: any; progress?: number }) => void) => void;
+      getNgrokSettings: () => Promise<{ configured: boolean; active: boolean; url: string | null; port: number; domain: string }>;
+      configureNgrok: (token: string, port: number, domain: string) => Promise<{ success: boolean; error?: string; configured?: boolean; active?: boolean; url?: string | null; port?: number; domain?: string }>;
     };
   }
 }

@@ -77,6 +77,45 @@ Start the app:
 npm run dev
 ```
 
+Expose the local Next.js server through ngrok (including WebSocket upgrades):
+```bash
+export NGROK_AUTHTOKEN="your-ngrok-auth-token"
+npm run dev:ngrok
+```
+
+Electron also starts the tunnel automatically when you run `npm run dev` and
+`NGROK_AUTHTOKEN` is set.
+
+The public `https://` URL printed by ngrok is the browser endpoint. Use its
+`wss://` equivalent for a WebSocket client. To tunnel an already-running
+WebSocket service, use `NGROK_PORT` with the standalone command:
+```bash
+NGROK_PORT=8080 npm run ngrok
+```
+
+Set `NGROK_DOMAIN` to use a reserved ngrok domain. The Settings page can also
+save a domain; when no domain is configured, ngrok uses a dynamic URL.
+
+## Authenticated WebSocket API
+
+Set an API password before starting the app:
+```bash
+export FLUXNOTES_API_PASSWORD="choose-a-strong-password"
+npm run dev
+```
+
+The authenticated API listens on port `8787` by default and is tunneled by ngrok. Connect to `/ws` and send an auth message first:
+```json
+{"type":"auth","password":"choose-a-strong-password"}
+```
+
+The response contains a one-hour `sessionCode` and a renewable `renewToken`. Use the session code to request notes:
+```json
+{"type":"list_notes"}
+```
+
+Image paths returned in notes are authenticated download links. Renew the session by sending `{"type":"renew","renewToken":"..."}` before the access token expires. Set `FLUXNOTES_API_PORT` to change the API port and keep `NGROK_PORT` aligned with it.
+
 Useful commands:
 ```bash
 npm run build
