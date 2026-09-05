@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('updater-event', (_event, data) => callback(data));
   },
   saveRawResult: (data: { sessionId?: string; rawContent: string; conversationId?: string }) => ipcRenderer.invoke('save-raw-result', data),
+  getApiToken: () => ipcRenderer.invoke('get-api-token'),
   getNgrokSettings: () => ipcRenderer.invoke('get-ngrok-settings'),
   configureNgrok: (token: string, port: number, domain: string) => ipcRenderer.invoke('configure-ngrok', token, port, domain),
 });

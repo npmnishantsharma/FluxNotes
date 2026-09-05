@@ -12,8 +12,8 @@ import { registerNotesIpcHandlers } from './ipc/notes';
 import { registerUpdaterHandlers } from './ipc/updater';
 import { processAiPrompt } from './ai';
 import { AIProvider, ChatSession } from './types';
+import { getApiToken, startApiServer, stopApiServer } from './api';
 import { configureNgrok, getNgrokSettings, startNgrok, stopNgrok } from './ngrok';
-import { startApiServer, stopApiServer } from './api';
 
 const sessionState: {
   pendingChatUrl: string | null;
@@ -37,6 +37,7 @@ function resetSessionState(): void {
 
 ensureDirectoriesExist();
 
+ipcMain.handle('get-api-token', () => getApiToken());
 ipcMain.handle('get-ngrok-settings', () => getNgrokSettings());
 ipcMain.handle('configure-ngrok', async (_event, token: string, port: number, domain: string) => {
   try {
@@ -92,10 +93,9 @@ ipcMain.handle('fill-chatgpt-input', async (_event, userText: string, attachment
 // --- Protocol & App Initialization ---
 app.whenReady().then(async () => {
   try {
-    await startApiServer();
-    await startNgrok();
+    if (await startApiServer()) await startNgrok();
   } catch (error) {
-    console.error('[ngrok] Could not start:', error);
+    console.error('[API/ngrok] Could not start:', error);
   }
 
   protocol.registerFileProtocol('local', (request, callback) => {

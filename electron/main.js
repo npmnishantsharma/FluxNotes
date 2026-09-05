@@ -7,8 +7,8 @@ const windows_1 = require("./windows");
 const notes_1 = require("./ipc/notes");
 const updater_1 = require("./ipc/updater");
 const ai_1 = require("./ai");
-const ngrok_1 = require("./ngrok");
 const api_1 = require("./api");
+const ngrok_1 = require("./ngrok");
 const sessionState = {
     pendingChatUrl: null,
     activeChatSessionId: null,
@@ -22,6 +22,7 @@ function resetSessionState() {
     sessionState.isGeminiSessionInitialized = false;
 }
 (0, storage_1.ensureDirectoriesExist)();
+electron_1.ipcMain.handle('get-api-token', () => (0, api_1.getApiToken)());
 electron_1.ipcMain.handle('get-ngrok-settings', () => (0, ngrok_1.getNgrokSettings)());
 electron_1.ipcMain.handle('configure-ngrok', async (_event, token, port, domain) => {
     try {
@@ -60,11 +61,11 @@ electron_1.ipcMain.handle('fill-chatgpt-input', async (_event, userText, attachm
 // --- Protocol & App Initialization ---
 electron_1.app.whenReady().then(async () => {
     try {
-        await (0, api_1.startApiServer)();
-        await (0, ngrok_1.startNgrok)();
+        if (await (0, api_1.startApiServer)())
+            await (0, ngrok_1.startNgrok)();
     }
     catch (error) {
-        console.error('[ngrok] Could not start:', error);
+        console.error('[API/ngrok] Could not start:', error);
     }
     electron_1.protocol.registerFileProtocol('local', (request, callback) => {
         const url = request.url.replace(/^local:\/\//, '');

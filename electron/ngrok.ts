@@ -54,8 +54,11 @@ export async function startNgrok(): Promise<void> {
     ...(domain ? { domain } : {}),
   });
 
-  console.log(`[ngrok] Forwarding ${tunnel.url()} to http://${host}:${port}`);
-  console.log('[ngrok] WebSocket clients can use the wss:// URL matching this tunnel.');
+  const publicUrl = tunnel?.url();
+  if (!publicUrl) throw new Error('Ngrok returned no public URL.');
+  console.log(`[ngrok] Forwarding ${publicUrl} to http://${host}:${port}`);
+  const websocketUrl = publicUrl.replace(/^https?:\/\//, 'wss://').replace(/\/$/, '') + '/ws';
+  console.log(`[ngrok] Mobile WebSocket endpoint: ${websocketUrl}`);
 }
 
 export async function getNgrokSettings(): Promise<{ configured: boolean; active: boolean; url: string | null; port: number; domain: string }> {

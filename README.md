@@ -77,44 +77,49 @@ Start the app:
 npm run dev
 ```
 
-Expose the local Next.js server through ngrok (including WebSocket upgrades):
+Expose the local mobile API through ngrok (including WebSocket upgrades):
 ```bash
 export NGROK_AUTHTOKEN="your-ngrok-auth-token"
-npm run dev:ngrok
+npm run dev
 ```
 
-Electron also starts the tunnel automatically when you run `npm run dev` and
-`NGROK_AUTHTOKEN` is set.
+Electron starts an authenticated local WebSocket API on `127.0.0.1:8787` and
+then starts the tunnel automatically when `NGROK_AUTHTOKEN` is available. On
+first launch, FluxNotes generates a 16-character API token and stores it in
+Electron's global user-data directory. The token is shown in Settings under
+Ngrok Tunnel. The desktop UI continues to use Next.js on port `3000`; the
+mobile client does not connect to that port.
 
-The public `https://` URL printed by ngrok is the browser endpoint. Use its
-`wss://` equivalent for a WebSocket client. To tunnel an already-running
-WebSocket service, use `NGROK_PORT` with the standalone command:
+The public URL printed by ngrok is the mobile API endpoint. Use its `wss://`
+equivalent plus `/ws`, for example `wss://your-domain.ngrok.app/ws`.
+The mobile client authenticates over that WebSocket:
+
+```json
+{"type":"auth","authToken":"the-token-shown-in-settings"}
+```
+
+The server returns `sessionId`, `token`, and `renewToken`. Send the `sessionId`
+and `token` with every command:
+
+```json
+{"type":"list_notes","sessionId":"...","token":"..."}
+```
+
+Clients may send `{"type":"ping"}` periodically; the server replies with
+`{"type":"pong","timestamp":...}`. The server also sends native WebSocket
+ping frames every 30 seconds and closes unresponsive connections.
+
+Use `renewToken` with a `renew` message after the access token expires. Image
+URLs returned in notes already contain the matching session ID and token.
+
+To tunnel an already-running WebSocket service, use `NGROK_PORT` with the
+standalone command:
 ```bash
 NGROK_PORT=8080 npm run ngrok
 ```
 
 Set `NGROK_DOMAIN` to use a reserved ngrok domain. The Settings page can also
 save a domain; when no domain is configured, ngrok uses a dynamic URL.
-
-## Authenticated WebSocket API
-
-Set an API password before starting the app:
-```bash
-export FLUXNOTES_API_PASSWORD="choose-a-strong-password"
-npm run dev
-```
-
-The authenticated API listens on port `8787` by default and is tunneled by ngrok. Connect to `/ws` and send an auth message first:
-```json
-{"type":"auth","password":"choose-a-strong-password"}
-```
-
-The response contains a one-hour `sessionCode` and a renewable `renewToken`. Use the session code to request notes:
-```json
-{"type":"list_notes"}
-```
-
-Image paths returned in notes are authenticated download links. Renew the session by sending `{"type":"renew","renewToken":"..."}` before the access token expires. Set `FLUXNOTES_API_PORT` to change the API port and keep `NGROK_PORT` aligned with it.
 
 Useful commands:
 ```bash

@@ -31,6 +31,7 @@ export default function SettingsPage() {
   const [ngrokPort, setNgrokPort] = useState('8787');
   const [ngrokDomain, setNgrokDomain] = useState('');
   const [ngrokState, setNgrokState] = useState<NgrokState>({ configured: false, active: false, url: null, port: 8787, domain: '' });
+  const [apiToken, setApiToken] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [updateMessage, setUpdateMessage] = useState('');
 
@@ -38,6 +39,7 @@ export default function SettingsPage() {
     const savedProvider = window.localStorage.getItem(PROVIDER_STORAGE_KEY);
     if (savedProvider === 'chatgpt' || savedProvider === 'gemini') setProvider(savedProvider);
 
+    void window.electronAPI?.getApiToken().then(setApiToken);
     void window.electronAPI?.getNgrokSettings().then((settings) => {
       if (!settings) return;
       setNgrokState(settings);
@@ -99,6 +101,10 @@ export default function SettingsPage() {
     else setUpdateMessage('You are running the latest available version.');
   };
 
+  const websocketUrl = ngrokState.url
+    ? `${ngrokState.url.replace(/^https?:\/\//, 'wss://').replace(/\/$/, '')}/ws`
+    : null;
+
   const renderContent = () => {
     if (activeSection === 'general') {
       return (
@@ -133,10 +139,13 @@ export default function SettingsPage() {
                   {ngrokState.active ? 'Active' : ngrokState.configured ? 'Configured, inactive' : 'Not configured'}
                 </div>
               </div>
-              {ngrokState.url && <span className="max-w-[48%] truncate font-mono text-xs text-teal-300" title={ngrokState.url}>{ngrokState.url}</span>}
+              {websocketUrl && <span className="max-w-[48%] truncate font-mono text-xs text-teal-300" title={websocketUrl}>{websocketUrl}</span>}
             </div>
           </div>
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
+            <Field label="Mobile API token" hint="Use this token in the WebSocket auth message.">
+              <input type="text" readOnly value={apiToken} className="settings-input font-mono" />
+            </Field>
             <Field label="Auth token" hint={ngrokState.configured ? 'Leave blank to keep the saved token.' : undefined}>
               <input type="password" value={ngrokToken} onChange={(event) => setNgrokToken(event.target.value)} placeholder={ngrokState.configured ? 'Saved token' : 'Paste your ngrok token'} className="settings-input" />
             </Field>
@@ -151,7 +160,7 @@ export default function SettingsPage() {
             <button onClick={disableNgrok} disabled={isSaving || !ngrokState.configured} className="settings-danger disabled:opacity-40">Disable tunnel</button>
             <button onClick={saveNgrok} disabled={isSaving} className="settings-primary disabled:opacity-50">{isSaving ? 'Saving...' : 'Save and start tunnel'}</button>
           </div>
-          <p className="mt-4 text-xs leading-5 text-slate-500">WebSocket clients should use the tunnel URL with <code className="text-slate-300">wss://</code>. The token is stored in Electron&apos;s local user-data directory.</p>
+          <p className="mt-4 text-xs leading-5 text-slate-500">Mobile clients use the tunnel URL with <code className="text-slate-300">wss://</code> at <code className="text-slate-300">/ws</code>. The local API defaults to port <code className="text-slate-300">8787</code>.</p>
         </SettingSection>
       );
     }
