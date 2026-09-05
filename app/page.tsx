@@ -3,6 +3,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { Capacitor } from '@capacitor/core';
 import { ChatGptMark, GeminiMark } from './onboarding/page';
 
 type SubTopic = {
@@ -39,6 +40,10 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      router.replace('/android');
+      return;
+    }
     const savedProvider = window.localStorage.getItem(PROVIDER_STORAGE_KEY);
     if (savedProvider === 'chatgpt' || savedProvider === 'gemini') {
       // eslint-disable-next-line react-hooks/set-state-in-effect

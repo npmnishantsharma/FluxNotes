@@ -3,6 +3,8 @@
 /* eslint-disable @next/next/no-img-element */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getMobileValue, mobileKeys } from '../mobile-storage';
+import { sendMobileCommand } from '../mobile-api';
 
 type NoteItem = {
   topicId: string;
@@ -13,9 +15,12 @@ type NoteItem = {
   pinned?: boolean;
 };
 
-const toImageSource = (imagePath: string) => (
-  imagePath.startsWith('local://') ? imagePath : `local://${encodeURI(imagePath.replace(/\\/g, '/'))}`
-);
+function toImageSource(imagePath: string, hostUrl: string): string {
+  if (imagePath.startsWith('local://') || imagePath.startsWith('data:')) return imagePath;
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath;
+  const host = hostUrl.replace(/^wss?:\/\//, (scheme) => scheme === 'wss://' ? 'https://' : 'http://').replace(/\/ws\/?$/, '');
+  return `${host}${imagePath.startsWith('/') ? imagePath : `/${imagePath}`}`;
+}
 
 export default function AndroidDashboardPage() {
   const router = useRouter();
@@ -23,14 +28,34 @@ export default function AndroidDashboardPage() {
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'home' | 'saved'>('home');
+  const [connectionStatus, setConnectionStatus] = useState('Connecting');
+  const [imageHostUrl, setImageHostUrl] = useState('');
 
   const loadNotes = useCallback(async () => {
     setIsLoading(true);
+    const [hostUrl, authToken] = await Promise.all([
+      getMobileValue(mobileKeys.hostUrl),
+      getMobileValue(mobileKeys.hostToken),
+    ]);
+    setImageHostUrl(hostUrl);
+
+    if (!hostUrl || !authToken) {
+      setConnectionStatus('Host not configured');
+      setNotes([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setConnectionStatus('Connecting');
     try {
-      const savedNotes = await window.electronAPI?.getAllNotes();
-      setNotes(Array.isArray(savedNotes) ? savedNotes : []);
+      setConnectionStatus('Loading notes');
+      const response = await sendMobileCommand<{ notes?: unknown[] }>({ type: 'list_notes' });
+      setNotes(Array.isArray(response.notes) ? response.notes as NoteItem[] : []);
+      setConnectionStatus('Connected');
     } catch (error) {
-      console.error('Failed to load notes library:', error);
+      console.error('Failed to load notes from host:', error);
+      setConnectionStatus(error instanceof Error ? error.message : 'Host unavailable');
+      setNotes([]);
     } finally {
       setIsLoading(false);
     }
@@ -56,24 +81,26 @@ export default function AndroidDashboardPage() {
   const renameNote = async (note: NoteItem) => {
     const topicName = window.prompt('Enter a new note name:', note.topicName || 'Untitled Topic');
     if (!topicName?.trim()) return;
-    await window.electronAPI?.renameNote(note.topicId, topicName);
+    await sendMobileCommand({ type: 'rename_note', topicId: note.topicId, topicName });
     await loadNotes();
   };
 
   const togglePinned = async (note: NoteItem) => {
-    await window.electronAPI?.setNotePinned(note.topicId, !note.pinned);
+    await sendMobileCommand({ type: 'set_note_pinned', topicId: note.topicId, pinned: !note.pinned });
     await loadNotes();
   };
 
   const deleteNote = async (note: NoteItem) => {
     if (!window.confirm(`Delete ${note.topicName || 'Untitled Topic'}?`)) return;
-    await window.electronAPI?.deleteNote(note.topicId);
+    await sendMobileCommand({ type: 'delete_note', topicId: note.topicId });
     await loadNotes();
   };
 
   const openNote = (topicId: string) => {
-    router.push(`/chat?id=${encodeURIComponent(topicId)}`);
+    router.push(`/android/view?id=${encodeURIComponent(topicId)}`);
   };
+
+  const canCreateNote = connectionStatus === 'Connected';
 
   return (
     <main className="min-h-dvh bg-[#091012] text-slate-100">
@@ -85,7 +112,7 @@ export default function AndroidDashboardPage() {
           </div>
           <button
             type="button"
-            onClick={() => router.push('/settings')}
+            onClick={() => router.push('/android/settings')}
             aria-label="Open settings"
             className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-slate-300 transition active:scale-95"
           >
@@ -100,8 +127,9 @@ export default function AndroidDashboardPage() {
             <h2 className="mt-2 max-w-[250px] text-2xl font-semibold leading-tight text-white">Turn one question into a visual note.</h2>
             <button
               type="button"
-              onClick={() => router.push('/chat')}
-              className="mt-5 inline-flex h-11 items-center gap-2 rounded-2xl bg-teal-300 px-4 text-sm font-semibold text-[#092022] shadow-lg shadow-teal-950/30 transition active:scale-[0.98]"
+              onClick={() => canCreateNote && router.push('/chat')}
+              disabled={!canCreateNote}
+              className="mt-5 inline-flex h-11 items-center gap-2 rounded-2xl bg-teal-300 px-4 text-sm font-semibold text-[#092022] shadow-lg shadow-teal-950/30 transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
               <PlusIcon />
               New note
@@ -116,6 +144,8 @@ export default function AndroidDashboardPage() {
           </div>
           <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs font-medium text-slate-400">{notes.length} total</span>
         </section>
+
+        <p className={`mt-2 text-xs ${connectionStatus === 'Connected' ? 'text-teal-300' : 'text-slate-500'}`}>{connectionStatus}</p>
 
         <div className="mt-4 flex h-12 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4">
           <SearchIcon />
@@ -146,7 +176,7 @@ export default function AndroidDashboardPage() {
               <button type="button" onClick={() => openNote(note.topicId)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                 <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-2xl bg-[#20393b]">
                   {note.images?.[0]
-                    ? <img src={toImageSource(note.images[0])} alt="" className="h-full w-full object-cover" />
+                    ? <img src={toImageSource(note.images[0], imageHostUrl)} alt="" className="h-full w-full object-cover" />
                     : <div className="flex h-full items-center justify-center text-teal-200/70"><BookIcon /></div>}
                 </div>
                 <div className="min-w-0">
@@ -173,8 +203,8 @@ export default function AndroidDashboardPage() {
 
       <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto flex h-[76px] max-w-lg items-center justify-around border-t border-white/10 bg-[#091012]/95 px-8 backdrop-blur-xl">
         <button type="button" onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 text-[10px] font-semibold ${activeTab === 'home' ? 'text-teal-300' : 'text-slate-500'}`}><HomeIcon /><span>Home</span></button>
-        <button type="button" onClick={() => router.push('/chat')} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-300 text-[#092022] shadow-lg shadow-teal-950/30 active:scale-95" aria-label="Create note"><PlusIcon /></button>
-        <button type="button" onClick={() => router.push('/settings')} className="flex flex-col items-center gap-1 text-[10px] font-semibold text-slate-500"><SettingsIcon /><span>Settings</span></button>
+        <button type="button" onClick={() => canCreateNote && router.push('/chat')} disabled={!canCreateNote} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-300 text-[#092022] shadow-lg shadow-teal-950/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none" aria-label="Create note"><PlusIcon /></button>
+        <button type="button" onClick={() => router.push('/android/settings')} className="flex flex-col items-center gap-1 text-[10px] font-semibold text-slate-500"><SettingsIcon /><span>Settings</span></button>
       </nav>
     </main>
   );

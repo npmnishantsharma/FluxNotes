@@ -1,10 +1,11 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { existsSync, createReadStream, readFileSync, writeFileSync, chmodSync } from 'fs';
 import { createServer, IncomingMessage, Server, ServerResponse } from 'http';
 import { app } from 'electron';
+import os from 'os';
 import path from 'path';
 import { WebSocket, WebSocketServer } from 'ws';
-import { getStoredNotes, imagesDir } from './utils/storage';
+import { getStoredNotes, imagesDir, saveNotesCollection } from './utils/storage';
 import { fromLocalImageUrl } from './utils/helpers';
 
 const ACCESS_TTL_MS = 60 * 60 * 1000;
@@ -44,6 +45,17 @@ type Session = {
   renewToken: string;
   accessExpiresAt: number;
   renewExpiresAt: number;
+  clientDeviceInfo: DeviceInfo;
+};
+
+type DeviceInfo = {
+  deviceId?: string;
+  deviceName?: string;
+  platform?: string;
+  model?: string;
+  osVersion?: string;
+  appVersion?: string;
+  clientType?: string;
 };
 
 let server: Server | null = null;
@@ -89,7 +101,30 @@ function readToken(token: unknown, expectedKind: 'access' | 'renew', sessionId: 
   }
 }
 
-function createSession(): Session {
+function sanitizeDeviceInfo(value: unknown): DeviceInfo {
+  if (!value || typeof value !== 'object') return {};
+  const input = value as Record<string, unknown>;
+  const info: DeviceInfo = {};
+  for (const key of ['deviceId', 'deviceName', 'platform', 'model', 'osVersion', 'appVersion', 'clientType']) {
+    const field = input[key];
+    if (typeof field === 'string' && field.trim()) info[key as keyof DeviceInfo] = field.trim().slice(0, 128);
+  }
+  return info;
+}
+
+function serverDeviceInfo(): DeviceInfo {
+  return {
+    deviceId: createHash('sha256').update(app.getPath('userData')).digest('hex').slice(0, 16),
+    deviceName: os.hostname(),
+    platform: process.platform,
+    model: process.arch,
+    osVersion: os.release(),
+    appVersion: app.getVersion(),
+    clientType: 'fluxnotes-desktop',
+  };
+}
+
+function createSession(clientDeviceInfo: DeviceInfo): Session {
   const sessionId = randomBytes(16).toString('hex');
   const accessExpiresAt = Date.now() + ACCESS_TTL_MS;
   const renewExpiresAt = Date.now() + RENEW_TTL_MS;
@@ -99,6 +134,7 @@ function createSession(): Session {
     renewToken: createToken('renew', sessionId, renewExpiresAt),
     accessExpiresAt,
     renewExpiresAt,
+    clientDeviceInfo,
   };
   sessions.set(sessionId, session);
   return session;
@@ -163,6 +199,22 @@ function sendSocket(socket: WebSocket, body: unknown): void {
   if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(body));
 }
 
+function mobileInfo(session: Session): Record<string, unknown> {
+  return {
+    appName: 'FluxNotes',
+    appVersion: app.getVersion(),
+    apiVersion: 1,
+    transport: 'websocket',
+    endpoint: '/ws',
+    heartbeatIntervalMs: HEARTBEAT_INTERVAL_MS,
+    accessTokenExpiresAt: session.accessExpiresAt,
+    renewTokenExpiresAt: session.renewExpiresAt,
+    serverDeviceInfo: serverDeviceInfo(),
+    clientDeviceInfo: session.clientDeviceInfo,
+    capabilities: ['list_notes', 'get_device_info', 'get_mobile_info', 'ping', 'renew'],
+  };
+}
+
 function handleSocket(socket: WebSocket): void {
   let session: Session | null = null;
   let isAlive = true;
@@ -197,7 +249,7 @@ function handleSocket(socket: WebSocket): void {
           socket.close(1008, 'Authentication failed');
           return;
         }
-        session = createSession();
+        session = createSession(sanitizeDeviceInfo(message.deviceInfo));
         sendSocket(socket, {
           type: 'authenticated',
           sessionId: session.sessionId,
@@ -205,6 +257,7 @@ function handleSocket(socket: WebSocket): void {
           renewToken: session.renewToken,
           expiresAt: session.accessExpiresAt,
           renewExpiresAt: session.renewExpiresAt,
+          mobileInfo: mobileInfo(session),
         });
         return;
       }
@@ -228,6 +281,40 @@ function handleSocket(socket: WebSocket): void {
 
       if (message.type === 'list_notes') {
         sendSocket(socket, { type: 'notes', notes: await notesPayload(authorized) });
+        return;
+      }
+
+      if (message.type === 'rename_note' || message.type === 'set_note_pinned' || message.type === 'delete_note') {
+        const notes = await getStoredNotes();
+        const topicId = typeof message.topicId === 'string' ? message.topicId : '';
+        const noteIndex = notes.findIndex((note) => note.topicId === topicId);
+        if (noteIndex < 0) {
+          sendSocket(socket, { type: 'command_error', code: 'NOTE_NOT_FOUND', message: 'Note not found.' });
+          return;
+        }
+        if (message.type === 'rename_note') {
+          const topicName = typeof message.topicName === 'string' ? message.topicName.trim() : '';
+          if (!topicName) {
+            sendSocket(socket, { type: 'command_error', code: 'INVALID_NAME', message: 'A note name is required.' });
+            return;
+          }
+          notes[noteIndex] = { ...notes[noteIndex], topicName };
+        } else if (message.type === 'set_note_pinned') {
+          notes[noteIndex] = { ...notes[noteIndex], pinned: Boolean(message.pinned) };
+        } else {
+          notes.splice(noteIndex, 1);
+        }
+        await saveNotesCollection(notes);
+        sendSocket(socket, { type: 'command_result', command: message.type, success: true });
+        return;
+      }
+
+      if (message.type === 'get_mobile_info' || message.type === 'get_device_info') {
+        const info = mobileInfo(authorized);
+        sendSocket(socket, {
+          type: message.type === 'get_device_info' ? 'device_info' : 'mobile_info',
+          info,
+        });
         return;
       }
 

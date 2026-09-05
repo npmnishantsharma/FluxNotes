@@ -10,6 +10,7 @@ const crypto_1 = require("crypto");
 const fs_1 = require("fs");
 const http_1 = require("http");
 const electron_1 = require("electron");
+const os_1 = __importDefault(require("os"));
 const path_1 = __importDefault(require("path"));
 const ws_1 = require("ws");
 const storage_1 = require("./utils/storage");
@@ -78,7 +79,30 @@ function readToken(token, expectedKind, sessionId) {
         return false;
     }
 }
-function createSession() {
+function sanitizeDeviceInfo(value) {
+    if (!value || typeof value !== 'object')
+        return {};
+    const input = value;
+    const info = {};
+    for (const key of ['deviceId', 'deviceName', 'platform', 'model', 'osVersion', 'appVersion', 'clientType']) {
+        const field = input[key];
+        if (typeof field === 'string' && field.trim())
+            info[key] = field.trim().slice(0, 128);
+    }
+    return info;
+}
+function serverDeviceInfo() {
+    return {
+        deviceId: (0, crypto_1.createHash)('sha256').update(electron_1.app.getPath('userData')).digest('hex').slice(0, 16),
+        deviceName: os_1.default.hostname(),
+        platform: process.platform,
+        model: process.arch,
+        osVersion: os_1.default.release(),
+        appVersion: electron_1.app.getVersion(),
+        clientType: 'fluxnotes-desktop',
+    };
+}
+function createSession(clientDeviceInfo) {
     const sessionId = (0, crypto_1.randomBytes)(16).toString('hex');
     const accessExpiresAt = Date.now() + ACCESS_TTL_MS;
     const renewExpiresAt = Date.now() + RENEW_TTL_MS;
@@ -88,6 +112,7 @@ function createSession() {
         renewToken: createToken('renew', sessionId, renewExpiresAt),
         accessExpiresAt,
         renewExpiresAt,
+        clientDeviceInfo,
     };
     sessions.set(sessionId, session);
     return session;
@@ -147,6 +172,21 @@ function sendSocket(socket, body) {
     if (socket.readyState === ws_1.WebSocket.OPEN)
         socket.send(JSON.stringify(body));
 }
+function mobileInfo(session) {
+    return {
+        appName: 'FluxNotes',
+        appVersion: electron_1.app.getVersion(),
+        apiVersion: 1,
+        transport: 'websocket',
+        endpoint: '/ws',
+        heartbeatIntervalMs: HEARTBEAT_INTERVAL_MS,
+        accessTokenExpiresAt: session.accessExpiresAt,
+        renewTokenExpiresAt: session.renewExpiresAt,
+        serverDeviceInfo: serverDeviceInfo(),
+        clientDeviceInfo: session.clientDeviceInfo,
+        capabilities: ['list_notes', 'get_device_info', 'get_mobile_info', 'ping', 'renew'],
+    };
+}
 function handleSocket(socket) {
     let session = null;
     let isAlive = true;
@@ -177,7 +217,7 @@ function handleSocket(socket) {
                     socket.close(1008, 'Authentication failed');
                     return;
                 }
-                session = createSession();
+                session = createSession(sanitizeDeviceInfo(message.deviceInfo));
                 sendSocket(socket, {
                     type: 'authenticated',
                     sessionId: session.sessionId,
@@ -185,6 +225,7 @@ function handleSocket(socket) {
                     renewToken: session.renewToken,
                     expiresAt: session.accessExpiresAt,
                     renewExpiresAt: session.renewExpiresAt,
+                    mobileInfo: mobileInfo(session),
                 });
                 return;
             }
@@ -205,6 +246,40 @@ function handleSocket(socket) {
             }
             if (message.type === 'list_notes') {
                 sendSocket(socket, { type: 'notes', notes: await notesPayload(authorized) });
+                return;
+            }
+            if (message.type === 'rename_note' || message.type === 'set_note_pinned' || message.type === 'delete_note') {
+                const notes = await (0, storage_1.getStoredNotes)();
+                const topicId = typeof message.topicId === 'string' ? message.topicId : '';
+                const noteIndex = notes.findIndex((note) => note.topicId === topicId);
+                if (noteIndex < 0) {
+                    sendSocket(socket, { type: 'command_error', code: 'NOTE_NOT_FOUND', message: 'Note not found.' });
+                    return;
+                }
+                if (message.type === 'rename_note') {
+                    const topicName = typeof message.topicName === 'string' ? message.topicName.trim() : '';
+                    if (!topicName) {
+                        sendSocket(socket, { type: 'command_error', code: 'INVALID_NAME', message: 'A note name is required.' });
+                        return;
+                    }
+                    notes[noteIndex] = { ...notes[noteIndex], topicName };
+                }
+                else if (message.type === 'set_note_pinned') {
+                    notes[noteIndex] = { ...notes[noteIndex], pinned: Boolean(message.pinned) };
+                }
+                else {
+                    notes.splice(noteIndex, 1);
+                }
+                await (0, storage_1.saveNotesCollection)(notes);
+                sendSocket(socket, { type: 'command_result', command: message.type, success: true });
+                return;
+            }
+            if (message.type === 'get_mobile_info' || message.type === 'get_device_info') {
+                const info = mobileInfo(authorized);
+                sendSocket(socket, {
+                    type: message.type === 'get_device_info' ? 'device_info' : 'mobile_info',
+                    info,
+                });
                 return;
             }
             sendSocket(socket, { type: 'error', code: 'UNKNOWN_COMMAND', message: 'Unknown command.' });

@@ -98,12 +98,31 @@ The mobile client authenticates over that WebSocket:
 {"type":"auth","authToken":"the-token-shown-in-settings"}
 ```
 
-The server returns `sessionId`, `token`, and `renewToken`. Send the `sessionId`
-and `token` with every command:
+The client may include its device details in the same request:
+
+```json
+{"type":"auth","authToken":"the-token-shown-in-settings","deviceInfo":{"deviceId":"android-123","deviceName":"Pixel","platform":"android","model":"Pixel 8","osVersion":"15","appVersion":"1.0.0","clientType":"fluxnotes-android"}}
+```
+
+The server returns `sessionId`, `token`, `renewToken`, and `mobileInfo`. The
+`mobileInfo` value contains both `serverDeviceInfo` and the sanitized
+`clientDeviceInfo`, allowing both devices to identify each other.
+
+Send the `sessionId` and `token` with every command:
 
 ```json
 {"type":"list_notes","sessionId":"...","token":"..."}
 ```
+
+The authentication response also includes `mobileInfo`. It can be refreshed
+after authentication with:
+
+```json
+{"type":"get_mobile_info","sessionId":"...","token":"..."}
+```
+
+The equivalent explicit device-info command is
+`{"type":"get_device_info","sessionId":"...","token":"..."}`.
 
 Clients may send `{"type":"ping"}` periodically; the server replies with
 `{"type":"pong","timestamp":...}`. The server also sends native WebSocket
@@ -127,6 +146,22 @@ npm run build
 npm run build:next
 npm run build:electron
 npm run lint
+```
+
+### Android app
+
+The mobile dashboard is packaged with Capacitor. Its routes are
+`/android`, `/android/dashboard`, `/android/settings`, and `/android/view`. On
+first launch, `/android` opens the native barcode scanner. Scan the QR code
+shown in desktop Settings to import a payload shaped as
+`{"host":"wss://.../ws","authToken":"..."}`. Host URL, host token, device
+ID, and session credentials use Capacitor Preferences; note operations use the
+authenticated WebSocket API.
+
+```bash
+npm run build:android   # Build Next assets and sync Android
+npm run android:open    # Open the native project in Android Studio
+npm run android:run     # Build/install on a device or emulator
 ```
 
 ### Build details

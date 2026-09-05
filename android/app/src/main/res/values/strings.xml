@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FluxNotes</string>
+    <string name="title_activity_main">FluxNotes</string>
+    <string name="package_name">in.nishantapps.fluxnotes</string>
+    <string name="custom_url_scheme">in.nishantapps.fluxnotes</string>
+</resources>

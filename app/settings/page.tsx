@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import QRCode from 'qrcode';
 
 const PROVIDER_STORAGE_KEY = 'fluxnotes-ai-provider';
 type SettingsSection = 'general' | 'provider' | 'ngrok' | 'appearance' | 'updates' | 'about';
@@ -32,12 +33,17 @@ export default function SettingsPage() {
   const [ngrokDomain, setNgrokDomain] = useState('');
   const [ngrokState, setNgrokState] = useState<NgrokState>({ configured: false, active: false, url: null, port: 8787, domain: '' });
   const [apiToken, setApiToken] = useState('');
+  const [pairingQr, setPairingQr] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [updateMessage, setUpdateMessage] = useState('');
 
   useEffect(() => {
     const savedProvider = window.localStorage.getItem(PROVIDER_STORAGE_KEY);
-    if (savedProvider === 'chatgpt' || savedProvider === 'gemini') setProvider(savedProvider);
+    if (savedProvider === 'chatgpt' || savedProvider === 'gemini') {
+      // Persisted provider selection is external state restored on mount.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setProvider(savedProvider);
+    }
 
     void window.electronAPI?.getApiToken().then(setApiToken);
     void window.electronAPI?.getNgrokSettings().then((settings) => {
@@ -105,6 +111,19 @@ export default function SettingsPage() {
     ? `${ngrokState.url.replace(/^https?:\/\//, 'wss://').replace(/\/$/, '')}/ws`
     : null;
 
+  useEffect(() => {
+    if (!websocketUrl || !apiToken) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPairingQr('');
+      return;
+    }
+    void QRCode.toDataURL(JSON.stringify({ host: websocketUrl, authToken: apiToken }), {
+      width: 220,
+      margin: 2,
+      color: { dark: '#d5fff6', light: '#111a1c' },
+    }).then(setPairingQr);
+  }, [apiToken, websocketUrl]);
+
   const renderContent = () => {
     if (activeSection === 'general') {
       return (
@@ -161,6 +180,7 @@ export default function SettingsPage() {
             <button onClick={saveNgrok} disabled={isSaving} className="settings-primary disabled:opacity-50">{isSaving ? 'Saving...' : 'Save and start tunnel'}</button>
           </div>
           <p className="mt-4 text-xs leading-5 text-slate-500">Mobile clients use the tunnel URL with <code className="text-slate-300">wss://</code> at <code className="text-slate-300">/ws</code>. The local API defaults to port <code className="text-slate-300">8787</code>.</p>
+          {pairingQr && <div className="mt-5 flex items-center gap-4 rounded-lg border border-white/10 bg-black/20 p-3"><img src={pairingQr} alt="Mobile pairing QR code" className="h-28 w-28 rounded-md" /><div><div className="text-xs font-medium text-slate-200">Pair Android app</div><p className="mt-1 text-[10px] leading-4 text-slate-500">Scan this code from the first Android screen to import the host URL and auth token.</p></div></div>}
         </SettingSection>
       );
     }
