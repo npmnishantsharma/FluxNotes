@@ -33,9 +33,16 @@ async function writeSettings(settings: NgrokSettings | null): Promise<void> {
 
 export async function startNgrok(): Promise<void> {
   const settings = readSettings();
-  const token = process.env.NGROK_AUTHTOKEN || settings?.token;
+  const useNgrokEnv = process.env.USE_NGROK;
+  const useNgrok = useNgrokEnv ? !['0', 'false', 'off', 'no'].includes(useNgrokEnv.toLowerCase()) : false;
+  const token = process.env.NGROK_TOKEN || process.env.NGROK_AUTHTOKEN || settings?.token;
+
+  if (!useNgrok && !settings?.token) {
+    console.log('[ngrok] Disabled: USE_NGROK is not set to true.');
+    return;
+  }
   if (!token) {
-    console.log('[ngrok] Skipping tunnel: NGROK_AUTHTOKEN is not set.');
+    console.log('[ngrok] Skipping tunnel: NGROK_TOKEN or NGROK_AUTHTOKEN is not set.');
     return;
   }
 
@@ -64,7 +71,7 @@ export async function startNgrok(): Promise<void> {
 export async function getNgrokSettings(): Promise<{ configured: boolean; active: boolean; url: string | null; port: number; domain: string }> {
   const settings = readSettings();
   return {
-    configured: Boolean(process.env.NGROK_AUTHTOKEN || settings?.token),
+    configured: Boolean(process.env.NGROK_TOKEN || process.env.NGROK_AUTHTOKEN || settings?.token),
     active: Boolean(tunnel),
     url: tunnel?.url() || null,
     port: Number(process.env.NGROK_PORT || settings?.port || 8787),

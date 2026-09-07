@@ -400,8 +400,56 @@ jobs:
           name: dist-ios-release
           path: ios-artifacts/
 
+  build-docker:
+    name: Build & Push Docker Image (GHCR & DockerHub)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to DockerHub (if credentials provided)
+        if: secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/${{ github.repository }}/fluxnotes-server
+            ${{ secrets.DOCKERHUB_USERNAME != '' && format('{0}/fluxnotes-server', secrets.DOCKERHUB_USERNAME) || '' }}
+          tags: |
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}}
+            type=ref,event=tag
+
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./docker-server
+          file: ./docker-server/Dockerfile
+          push: ${{ startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
   release:
-    needs: [build-electron, build-android, build-ios]
+    needs: [build-electron, build-android, build-ios, build-docker]
     if: always()
     runs-on: ubuntu-latest
     steps:
