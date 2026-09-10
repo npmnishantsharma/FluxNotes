@@ -501,6 +501,22 @@ function handleHttp(request: IncomingMessage, response: ServerResponse): void {
   json(response, 404, { error: 'Not found.' });
 }
 
+export async function broadcastNotesUpdate(): Promise<void> {
+  if (!webSocketServer || webSocketServer.clients.size === 0) return;
+  try {
+    const notes = await notesPayload();
+    const payload = JSON.stringify({ type: 'notes_updated', notes });
+    for (const client of webSocketServer.clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        logResponse('websocket', { type: 'notes_updated', noteCount: notes.length });
+        client.send(payload);
+      }
+    }
+  } catch (err) {
+    console.error('[API] Failed to broadcast notes update:', err);
+  }
+}
+
 export async function startApiServer(): Promise<boolean> {
   if (server) return true;
   if (!apiToken) {

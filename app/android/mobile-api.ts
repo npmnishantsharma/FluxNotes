@@ -84,3 +84,76 @@ export async function sendMobileCommand<T = Record<string, unknown>>(command: Mo
 
   throw lastError ?? new Error('Host command failed after retries.');
 }
+
+export function subscribeMobileRealtime(
+  onNotesUpdated: (notes?: unknown[]) => void,
+  onStatusChange?: (status: string) => void,
+): () => void {
+  let socket: WebSocket | null = null;
+  let isClosedManually = false;
+  let reconnectTimer: number | null = null;
+
+  async function connect() {
+    if (isClosedManually) return;
+    const [hostUrl, authToken, deviceInfo] = await Promise.all([
+      getMobileValue(mobileKeys.hostUrl),
+      getMobileValue(mobileKeys.hostToken),
+      getMobileDeviceInfo(),
+    ]);
+
+    if (!hostUrl || !authToken) {
+      onStatusChange?.('Host not configured');
+      return;
+    }
+
+    try {
+      const wsUrl = toWebSocketUrl(hostUrl);
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        socket?.send(JSON.stringify({ type: 'auth', authToken, deviceInfo }));
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data) as Record<string, unknown>;
+          if (message.type === 'authenticated') {
+            void setMobileValue(mobileKeys.sessionId, String(message.sessionId || ''));
+            void setMobileValue(mobileKeys.sessionToken, String(message.token || ''));
+            void setMobileValue(mobileKeys.renewToken, String(message.renewToken || ''));
+            onStatusChange?.('Connected (Real-time)');
+          } else if (message.type === 'notes_updated') {
+            onNotesUpdated(Array.isArray(message.notes) ? message.notes : undefined);
+          }
+        } catch (e) {
+          console.error('[Realtime WS] Message parse error:', e);
+        }
+      };
+
+      socket.onerror = () => {
+        onStatusChange?.('Real-time connection error');
+      };
+
+      socket.onclose = () => {
+        if (!isClosedManually) {
+          reconnectTimer = window.setTimeout(connect, 4000);
+        }
+      };
+    } catch {
+      if (!isClosedManually) {
+        reconnectTimer = window.setTimeout(connect, 4000);
+      }
+    }
+  }
+
+  void connect();
+
+  return () => {
+    isClosedManually = true;
+    if (reconnectTimer) window.clearTimeout(reconnectTimer);
+    if (socket) {
+      socket.close();
+      socket = null;
+    }
+  };
+}

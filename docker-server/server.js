@@ -68,17 +68,29 @@ function loadSystemPrompt() {
   return '';
 }
 
+// PERFORMANCE OPTIMIZATION: In-memory cache for result logs to eliminate synchronous file I/O blocking during server response processing.
+let resultLogCache = null;
+
 function appendResultLog(entry) {
   if (!LOG_RESPONSES) return;
   const logPath = path.join(LOG_DIR, 'result.json');
   try {
-    let arr = [];
-    try {
-      const raw = fs.readFileSync(logPath, 'utf8');
-      if (raw) arr = JSON.parse(raw);
-    } catch (_) {}
-    arr.push({ timestamp: new Date().toISOString(), ...entry });
-    fs.writeFileSync(logPath, JSON.stringify(arr, null, 2));
+    if (resultLogCache === null) {
+      try {
+        const raw = fs.readFileSync(logPath, 'utf8');
+        if (raw) resultLogCache = JSON.parse(raw);
+        else resultLogCache = [];
+      } catch (_) {
+        resultLogCache = [];
+      }
+    }
+    resultLogCache.push({ timestamp: new Date().toISOString(), ...entry });
+    if (resultLogCache.length > 500) {
+      resultLogCache = resultLogCache.slice(-500);
+    }
+    fs.promises.writeFile(logPath, JSON.stringify(resultLogCache, null, 2)).catch((err) => {
+      console.warn('[SERVER] Asynchronous log write failed:', err.message);
+    });
   } catch (err) {
     console.warn('[SERVER] Log write failed:', err.message);
   }

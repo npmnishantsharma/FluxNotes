@@ -21,16 +21,29 @@ export function ensureDirectoriesExist(): void {
   }
 }
 
+// PERFORMANCE OPTIMIZATION: In-memory cache for NotesData to prevent repeated disk I/O operations.
+let notesDataCache: NotesData | null = null;
+
+export function clearNotesDataCache(): void {
+  notesDataCache = null;
+}
+
 export async function readDataFileAsync(): Promise<NotesData> {
+  // PERFORMANCE OPTIMIZATION: Return structuredClone of in-memory notesDataCache to eliminate disk read latency and isolate references across IPC lifecycles.
+  if (notesDataCache !== null) {
+    return structuredClone(notesDataCache);
+  }
+
   try {
     if (fs.existsSync(dataFilePath)) {
       const rawData = await fs.promises.readFile(dataFilePath, 'utf-8');
       const parsed = JSON.parse(rawData);
-      return {
+      notesDataCache = {
         notes_collection: Array.isArray(parsed.notes_collection) ? parsed.notes_collection : [],
         image_records: Array.isArray(parsed.image_records) ? parsed.image_records : [],
         failed_pages: Array.isArray(parsed.failed_pages) ? parsed.failed_pages : [],
       };
+      return structuredClone(notesDataCache);
     }
   } catch (err) {
     const error = err as Error;
@@ -41,12 +54,16 @@ export async function readDataFileAsync(): Promise<NotesData> {
       details: { error: error.message, stack: error.stack, filePath: dataFilePath },
     });
   }
-  return { notes_collection: [], image_records: [], failed_pages: [] };
+
+  notesDataCache = { notes_collection: [], image_records: [], failed_pages: [] };
+  return structuredClone(notesDataCache);
 }
 
 export async function writeDataFileAsync(data: NotesData): Promise<void> {
   try {
     await fs.promises.writeFile(dataFilePath, JSON.stringify(data, null, 2), 'utf-8');
+    // PERFORMANCE OPTIMIZATION: Update in-memory cache strictly after the asynchronous file write operation succeeds to prevent cache inconsistency.
+    notesDataCache = structuredClone(data);
   } catch (err) {
     const error = err as Error;
     console.error('Failed to write local JSON data file:', err);
