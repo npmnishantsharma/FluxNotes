@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { downloadNoteImages, getCachedNotes, getMobileValue, mobileKeys, setCachedNotes, toHttpApiUrl } from '../mobile-storage';
-import { sendMobileCommand } from '../mobile-api';
+import { sendMobileCommand, subscribeMobileRealtime } from '../mobile-api';
 
 type NoteItem = {
   topicId: string;
@@ -74,11 +74,35 @@ export default function AndroidDashboardPage() {
     }
   }, []);
 
+  const handleRealtimeNotes = useCallback(async (rawNotes?: unknown[]) => {
+    if (!rawNotes) {
+      await loadNotes();
+      return;
+    }
+    const [hostUrl] = await Promise.all([getMobileValue(mobileKeys.hostUrl)]);
+    const receivedNotes = rawNotes as NoteItem[];
+    const sanitizedUrl = (hostUrl || '').replace(/\/ws$/, '');
+    const downloadedNotes = await Promise.all(receivedNotes.map(async (note) => ({
+      ...note,
+      images: await downloadNoteImages(note.images, sanitizedUrl, note.topicId),
+    })));
+    await setCachedNotes(downloadedNotes);
+    setNotes(downloadedNotes);
+    setConnectionStatus('Connected (Real-time)');
+  }, [loadNotes]);
+
   useEffect(() => {
-    // The initial library fetch synchronizes state with Electron storage.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadNotes();
-  }, [loadNotes]);
+    const unsubscribe = subscribeMobileRealtime((rawNotes) => {
+      void handleRealtimeNotes(rawNotes);
+    }, (status) => {
+      setConnectionStatus(status);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [loadNotes, handleRealtimeNotes]);
 
   const filteredNotes = useMemo(() => {
     const query = search.trim().toLowerCase();

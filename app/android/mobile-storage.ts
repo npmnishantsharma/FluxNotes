@@ -31,17 +31,26 @@ export async function setMobileValue(key: string, value: string): Promise<void> 
   await Preferences.set({ key, value });
 }
 
+// PERFORMANCE OPTIMIZATION: In-memory cache for mobile notes to avoid repeated disk reads.
+let memoryCachedNotes: CachedNote[] | null = null;
+
 export async function getCachedNotes(): Promise<CachedNote[]> {
+  if (memoryCachedNotes !== null) {
+    return memoryCachedNotes;
+  }
   try {
     const value = await getMobileValue(mobileKeys.notesCache);
     const notes = JSON.parse(value || '[]');
-    return Array.isArray(notes) ? notes : [];
+    memoryCachedNotes = Array.isArray(notes) ? notes : [];
+    return memoryCachedNotes;
   } catch {
-    return [];
+    memoryCachedNotes = [];
+    return memoryCachedNotes;
   }
 }
 
 export async function setCachedNotes(notes: CachedNote[]): Promise<void> {
+  memoryCachedNotes = notes;
   await setMobileValue(mobileKeys.notesCache, JSON.stringify(notes));
 }
 

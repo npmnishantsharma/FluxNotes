@@ -21,6 +21,7 @@ import {
 } from '../utils/helpers';
 import { CHATGPT_URL, GEMINI_SIGN_IN_URL } from '../windows';
 import { getLogs, clearLogs } from '../utils/logger';
+import { broadcastNotesUpdate } from '../api';
 
 export function registerNotesIpcHandlers(
   getMainWindow: () => BrowserWindow | null,
@@ -123,6 +124,7 @@ export function registerNotesIpcHandlers(
     }
 
     await saveNotesCollection(notes);
+    void broadcastNotesUpdate();
     return true;
   });
 
@@ -136,6 +138,7 @@ export function registerNotesIpcHandlers(
 
     notes[index] = { ...notes[index], topicName: name };
     await saveNotesCollection(notes);
+    void broadcastNotesUpdate();
     return { success: true };
   });
 
@@ -146,6 +149,7 @@ export function registerNotesIpcHandlers(
 
     notes[index] = { ...notes[index], pinned: Boolean(pinned) };
     await saveNotesCollection(notes);
+    void broadcastNotesUpdate();
     return { success: true };
   });
 
@@ -173,6 +177,7 @@ export function registerNotesIpcHandlers(
       }
     }));
     await saveNotesCollection(remainingNotes);
+    void broadcastNotesUpdate();
 
     const removedPaths = new Set(removableImagePaths);
     const records = await getStoredRecords();
