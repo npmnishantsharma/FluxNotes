@@ -44,6 +44,7 @@ declare global {
       getFailedPages: () => Promise<{ success: boolean; failedPages?: Array<{pageNumber: number; subTopicNames: string[]; originalTopic: string; sessionId: string; errorMessage?: string; timestamp: number}> }>;
       saveFailedPage: (failedPage: {pageNumber: number; subTopicNames: string[]; originalTopic: string; sessionId: string; errorMessage?: string; timestamp: number, notesTheme?: Record<string, unknown> | undefined}) => Promise<{ success: boolean }>;
       removeFailedPage: (pageNumber: number, sessionId: string) => Promise<{ success: boolean }>;
+      saveRawResult: (data: { sessionId?: string; rawContent: string; conversationId?: string }) => Promise<{ success: boolean; error?: string }>;
       getLogs: () => Promise<{ success: boolean; logs?: string; error?: string }>;
       clearLogs: () => Promise<{ success: boolean; error?: string }>;
     };
