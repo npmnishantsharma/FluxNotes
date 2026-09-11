@@ -11,6 +11,9 @@ public class MainActivity extends BridgeActivity {
 		super.onCreate(savedInstanceState);
 
 		WebSettings settings = getBridge().getWebView().getSettings();
+		settings.setJavaScriptEnabled(true);
+		settings.setDomStorageEnabled(true);
+		settings.setAllowFileAccess(true);
 		settings.setSupportZoom(false);
 		settings.setBuiltInZoomControls(false);
 		settings.setDisplayZoomControls(false);

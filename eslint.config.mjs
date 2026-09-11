@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     "electron/**",
     "docker-server/**",
     "scripts/**",
+    "android/**",
   ]),
 ]);
 

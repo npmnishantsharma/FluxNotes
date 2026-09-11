@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Capacitor } from '@capacitor/core';
 import { NoteItem, AIProvider } from '@/types/notes';
 import { DashboardTitleBar } from '@/components/dashboard/DashboardTitleBar';
 import { UpdateBanner } from '@/components/dashboard/UpdateBanner';
@@ -24,10 +23,6 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      router.replace('/android');
-      return;
-    }
     const savedProvider = window.localStorage.getItem(PROVIDER_STORAGE_KEY);
     if (savedProvider === 'chatgpt' || savedProvider === 'gemini') {
       // eslint-disable-next-line react-hooks/set-state-in-effect
