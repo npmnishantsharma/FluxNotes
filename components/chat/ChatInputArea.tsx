@@ -29,6 +29,9 @@ type ChatInputAreaProps = {
   onSendPrompt: (promptText: string) => void;
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onRemoveFile: (index: number) => void;
+  selectedImagePageNumber: number | null;
+  onDeselectImage: () => void;
 };
 
 export function ChatInputArea({
@@ -46,14 +49,19 @@ export function ChatInputArea({
   onSendPrompt,
   onFileChange,
   onKeyDown,
+  onRemoveFile,
+  selectedImagePageNumber,
+  onDeselectImage,
 }: ChatInputAreaProps) {
   const [hintIndex, setHintIndex] = useState(0);
   
   // Calculate current typing hint based on conditions
   const typingHint = useMemo(() => {
     if (isProcessing || inputText) return '';
+    const hasImageAttachment = selectedFiles.some(file => file.mimeType.startsWith('image/'));
+    if (hasImageAttachment) return 'Describe changes to regenerate this page...';
     return TYPING_HINTS[hintIndex];
-  }, [isProcessing, inputText, hintIndex]);
+  }, [isProcessing, inputText, hintIndex, selectedFiles]);
 
   useEffect(() => {
     if (!isProcessing && !inputText) {
@@ -107,12 +115,56 @@ export function ChatInputArea({
           <div className="pointer-events-none absolute -inset-1 rounded-full bg-teal-500/15 blur-2xl transition-all duration-300" />
           <div className="pointer-events-none absolute -inset-2 rounded-full bg-cyan-400/10 blur-[30px] transition-all duration-300" />
 
+          {selectedImagePageNumber !== null && selectedFiles.some(file => file.mimeType.startsWith('image/')) && (
+            <div className="mb-2 flex items-center gap-3 rounded-lg border border-teal-500/30 bg-[#111217]/90 px-3 py-2 shadow-lg">
+              <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded border border-white/10">
+                {(() => {
+                  const imageFile = selectedFiles.find(file => file.mimeType.startsWith('image/'));
+                  return imageFile ? (
+                    <img 
+                      src={`data:${imageFile.mimeType};base64,${imageFile.base64}`}
+                      alt={`Page ${selectedImagePageNumber}`} 
+                      className="h-full w-full object-cover"
+                    />
+                  ) : null;
+                })()}
+                <div className="absolute bottom-0 left-0 right-0 bg-teal-500/90 px-1 py-0.5 text-[9px] font-medium text-white text-center">
+                  Page {selectedImagePageNumber}
+                </div>
+              </div>
+              <div className="flex flex-1 flex-col">
+                <span className="text-xs font-medium text-teal-200">
+                  Selected for regeneration
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  Page {selectedImagePageNumber}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onDeselectImage}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/70 text-xs text-white hover:bg-black/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-400"
+                aria-label="Deselect image"
+              >
+                ×
+              </button>
+            </div>
+          )}
           {selectedFiles.length > 0 && (
             <div className="mb-2 flex max-h-36 flex-wrap gap-2 overflow-y-auto rounded-lg border border-teal-500/30 bg-[#111217]/90 p-2 shadow-lg">
               {selectedFiles.map((file, index) => (
                 <div key={`${file.filename}-${index}`} className="relative flex min-w-44 max-w-60 items-center gap-2 overflow-hidden rounded-md border border-white/10 bg-white/5 p-2" title={file.filename}>
                   {file.mimeType.startsWith('image/') ? (
-                    <img src={`data:${file.mimeType};base64,${file.base64}`} alt={file.filename} className="h-10 w-10 shrink-0 rounded object-cover" />
+                    <div className="relative h-10 w-10 shrink-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-teal-500/20">
+                        <svg className="h-6 w-6 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <span className="absolute bottom-0 left-0 right-0 rounded-b bg-teal-500/80 px-1 py-0.5 text-[9px] font-medium text-white text-center">
+                        Regen
+                      </span>
+                    </div>
                   ) : (
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded bg-black/20">
                       <FileTypeIcon kind={getFileKind(file.mimeType, file.filename)} />
@@ -126,7 +178,7 @@ export function ChatInputArea({
                   </span>
                   <button
                     type="button"
-                    onClick={() => setSelectedFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}
+                    onClick={() => onRemoveFile(index)}
                     className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/70 text-[11px] text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-400"
                     aria-label={`Remove ${file.filename}`}
                   >
@@ -140,12 +192,12 @@ export function ChatInputArea({
           <div className="relative flex items-end rounded-xl border border-teal-500/30 bg-[#111217]/80 pr-2 shadow-2xl backdrop-blur-xl focus-within:border-cyan-400/50 focus-within:shadow-[0_0_30px_rgba(45,212,191,0.3)] transition-all duration-300 focus-within:animate-gradient-glow">
             {provider === 'chatgpt' && (
               <>
-                <input id="chat-attachment" type="file" multiple onChange={onFileChange} disabled={isProcessing || selectedFiles.length >= 10} className="sr-only" />
+                <input id="chat-attachment" type="file" multiple onChange={onFileChange} disabled={isProcessing || selectedFiles.length >= 10 || selectedFiles.some(file => file.mimeType.startsWith('image/'))} className="sr-only" />
                 <label
                   htmlFor="chat-attachment"
-                  title="Attach file"
+                  title={selectedFiles.some(file => file.mimeType.startsWith('image/')) ? "Cannot attach files when image is selected for regeneration" : "Attach file"}
                   aria-label="Attach file"
-                  className="mb-2 ml-2 flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-xl leading-none text-teal-200 transition hover:bg-white/10"
+                  className={`mb-2 ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xl leading-none text-teal-200 transition ${selectedFiles.some(file => file.mimeType.startsWith('image/')) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-white/10'}`}
                 >
                   +
                 </label>

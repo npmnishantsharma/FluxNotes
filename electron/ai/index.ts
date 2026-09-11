@@ -99,7 +99,7 @@ export async function processAiPrompt(
           : [];
 
         result = {
-          rawText: geminiResult?.rawText || '',
+          rawText: String(geminiResult?.rawText || ''),
           conversationId: null,
           messageId: null,
           session: null,
@@ -265,7 +265,7 @@ export async function processAiPrompt(
         const generatedAssetImages = window.__fluxnotesGeneratedAssetImages || [];
 
         return {
-          rawText: finalOutput.text || finalOutput,
+          rawText: String(finalOutput.text || finalOutput || ''),
           messageId: useMessageId,
           conversationId: activeConvoId,
           session: window.__fluxnotesChatGPT.getSession(sessionId),
@@ -588,7 +588,7 @@ export async function processAiPrompt(
       logError({
         category: 'parsing',
         message: 'Failed to parse JSON response',
-        details: { error: err.message, stack: err.stack, rawText: rawText.substring(0, 500) },
+        details: { error: err.message, stack: err.stack, rawText: typeof rawText === 'string' ? rawText.substring(0, 500) : String(rawText).substring(0, 500) },
       });
       return {
         resultPayload: { error: 'Failed to parse JSON', raw: rawText, messageId, conversationId, generationId, fileId, generatedImages },

@@ -46,6 +46,7 @@ declare global {
       removeFailedPage: (pageNumber: number, sessionId: string) => Promise<{ success: boolean }>;
       getLogs: () => Promise<{ success: boolean; logs?: string; error?: string }>;
       clearLogs: () => Promise<{ success: boolean; error?: string }>;
+      convertLocalImageToBase64: (filePath: string) => Promise<{ success: boolean; base64?: string; mimeType?: string; error?: string }>;
     };
   }
 }

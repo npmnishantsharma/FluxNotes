@@ -44,4 +44,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   syncSessionToServer: (serverUrl: string, password: string) => ipcRenderer.invoke('sync-session-to-server', serverUrl, password),
   getLogs: () => ipcRenderer.invoke('get-logs'),
   clearLogs: () => ipcRenderer.invoke('clear-logs'),
+  convertLocalImageToBase64: (filePath: string) => ipcRenderer.invoke('convert-local-image-to-base64', filePath),
 });

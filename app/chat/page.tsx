@@ -40,6 +40,9 @@ export default function NewChatPage() {
   const [provider, setProvider] = useState<AIProvider>('chatgpt');
   const [selectedFiles, setSelectedFiles] = useState<ChatAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [selectedImagePageNumber, setSelectedImagePageNumber] = useState<number | null>(null);
+  const [noteTimestamp, setNoteTimestamp] = useState<number | null>(null);
+  const [regeneratingPageNumber, setRegeneratingPageNumber] = useState<number | null>(null);
   const pageTitle = assistantData?.topicName?.trim() || 'New Chat';
 
   const containerEndRef = useRef<HTMLDivElement | null>(null);
@@ -98,11 +101,25 @@ export default function NewChatPage() {
             .sort((first, second) => first.pageNumber - second.pageNumber);
           pageImagesRef.current = updatedImages;
 
+          // Clear regenerating state when new image arrives
+          const wasRegenerating = regeneratingPageNumber === nextPgNum;
+          if (wasRegenerating) {
+            setRegeneratingPageNumber(null);
+          }
+
           // Scroll to the newly added image
           setTimeout(() => {
             const targetImg = imageRefs.current[nextPgNum - 1];
             if (targetImg) {
               targetImg.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              
+              // Add fade-in animation for regenerated images
+              if (wasRegenerating) {
+                targetImg.classList.add('fade-in-from-blur');
+                setTimeout(() => {
+                  targetImg.classList.remove('fade-in-from-blur');
+                }, 1500);
+              }
             }
           }, 100);
 
@@ -207,6 +224,7 @@ export default function NewChatPage() {
 
         pageImagesRef.current = savedImages;
         setPageImages(savedImages);
+        setNoteTimestamp(note.timestamp || null);
         setAssistantData({
           status: 'update',
           topicId: note.topicId,
@@ -238,7 +256,73 @@ export default function NewChatPage() {
     try {
       const latestAssistantData = assistantData;
 
-      if (isStartOrContinue(promptText) && assistantData?.subTopics && assistantData.subTopics.length > 0) {
+      // Handle image regeneration case
+      const isRegenerationMode = selectedImagePageNumber !== null;
+      if (isRegenerationMode && latestAssistantData?.subTopics && latestAssistantData.subTopics.length > 0) {
+        // Check if note was created before September 11, 2026
+        const cutoffDate = new Date('2026-09-11').getTime();
+        const isOldNote = noteTimestamp && noteTimestamp < cutoffDate;
+
+        // Find the actual image file path from pageImages
+        const targetPageNumber = selectedImagePageNumber ? String(selectedImagePageNumber) : "1";
+        const targetImage = pageImages.find(img => img.pageNumber === selectedImagePageNumber);
+        const imagePath = targetImage?.filePath.replace(/^local:\/\//, '') || '';
+
+        // Get the subtopic for the specific page being regenerated
+        const targetSubTopic = latestAssistantData.subTopics.find(
+          subTopic => String(subTopic.pageNumber) === targetPageNumber
+        );
+        const subTopicNames = targetSubTopic?.names || [];
+
+        // Set regenerating state for animation
+        setRegeneratingPageNumber(selectedImagePageNumber);
+
+        // Get the actual attachment with base64 data
+        const imageAttachment = attachments.find(file => file.mimeType.startsWith('image/'));
+        
+        if (isOldNote) {
+          // For old notes, send the edit directly as prompt and get the image to replace it
+          const oldNotePayload = JSON.stringify({
+            status: 'regenerate',
+            subTopics: subTopicNames,
+            pageNumber: targetPageNumber,
+            edit: promptText,
+            image: imagePath,
+            isOldNote: true
+          }, null, 2);
+
+          // Send the actual attachment
+          const responseData = await window.electronAPI?.fillChatGptInput(oldNotePayload, imageAttachment ? [imageAttachment] : null);
+          
+          if (responseData && typeof responseData === 'object') {
+            chatSessionRef.current = {
+              sessionId: responseData.chatSessionId || chatSessionRef.current.sessionId,
+              session: responseData.chatSession || chatSessionRef.current.session,
+              chatUrl: responseData.chatUrl || chatSessionRef.current.chatUrl,
+            };
+          }
+        } else {
+          // For new notes, use the standard regeneration payload
+          const regeneratePayload = JSON.stringify({
+            status: 'regenerate',
+            subTopics: subTopicNames,
+            pageNumber: targetPageNumber,
+            edit: promptText,
+            image: imagePath
+          }, null, 2);
+
+          // Send the actual attachment
+          const responseData = await window.electronAPI?.fillChatGptInput(regeneratePayload, imageAttachment ? [imageAttachment] : null);
+          
+          if (responseData && typeof responseData === 'object') {
+            chatSessionRef.current = {
+              sessionId: responseData.chatSessionId || chatSessionRef.current.sessionId,
+              session: responseData.chatSession || chatSessionRef.current.session,
+              chatUrl: responseData.chatUrl || chatSessionRef.current.chatUrl,
+            };
+          }
+        }
+      } else if (isStartOrContinue(promptText) && assistantData?.subTopics && assistantData.subTopics.length > 0) {
         const subTopics = assistantData.subTopics;
         const totalPages = subTopics.length;
 
@@ -360,15 +444,26 @@ export default function NewChatPage() {
       setIsProcessing(false);
       setLoadingPagesCount(0);
       setCurrentlyGeneratingPage(null);
+      setRegeneratingPageNumber(null);
     }
-    if (attachments === selectedFiles) setSelectedFiles([]);
-  }, [isProcessing, assistantData, selectedFiles]);
+    if (attachments === selectedFiles) {
+      setSelectedFiles([]);
+      setSelectedImagePageNumber(null);
+    }
+  }, [isProcessing, assistantData, selectedFiles, selectedImagePageNumber, pageImages, noteTimestamp]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     event.target.value = '';
     setAttachmentError(null);
     if (files.length === 0) return;
+
+    // Check if there's already an image selected for regeneration
+    const hasImageAttachment = selectedFiles.some(file => file.mimeType.startsWith('image/'));
+    if (hasImageAttachment) {
+      setAttachmentError('Cannot attach files when an image is selected for regeneration. Deselect the image first.');
+      return;
+    }
 
     const availableSlots = Math.max(0, 10 - selectedFiles.length);
     const filesToRead = files.slice(0, availableSlots);
@@ -402,6 +497,25 @@ export default function NewChatPage() {
       .catch((error: Error) => setAttachmentError(error.message));
   };
 
+  const handleRemoveFile = (index: number) => {
+    setSelectedFiles((current) => {
+      const removedFile = current[index];
+      const newFiles = current.filter((_, fileIndex) => fileIndex !== index);
+      
+      // If the removed file was an image, clear the image page number
+      if (removedFile?.mimeType.startsWith('image/')) {
+        setSelectedImagePageNumber(null);
+      }
+      
+      return newFiles;
+    });
+  };
+
+  const handleDeselectImage = () => {
+    setSelectedImagePageNumber(null);
+    setRegeneratingPageNumber(null);
+  };
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
@@ -414,6 +528,43 @@ export default function NewChatPage() {
     const targetImg = imageRefs.current[pageNum - 1];
     if (targetImg) {
       targetImg.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleImageClick = async (image: GeneratedPageImage) => {
+    if (isProcessing) {
+      setAttachmentError('Cannot add images while generation is in progress');
+      return;
+    }
+
+    try {
+      const filePath = image.filePath.replace(/^local:\/\//, '');
+      const result = await window.electronAPI?.convertLocalImageToBase64?.(filePath);
+      
+      if (result?.success && result.base64) {
+        const fileName = `page-${image.pageNumber}.png`;
+        const newAttachment: ChatAttachment = {
+          base64: result.base64,
+          filename: fileName,
+          mimeType: result.mimeType || 'image/png',
+          fileSize: result.base64.length * 0.75, // Approximate size for base64
+        };
+        
+        setSelectedFiles((current) => {
+          // For image regeneration, only allow one image at a time
+          if (current.length >= 1) {
+            setAttachmentError('Only one image can be attached for regeneration.');
+            return current;
+          }
+          setSelectedImagePageNumber(image.pageNumber);
+          return [newAttachment];
+        });
+      } else {
+        setAttachmentError(result?.error || 'Failed to add image as attachment');
+      }
+    } catch (error) {
+      console.error('Error converting image to attachment:', error);
+      setAttachmentError('Failed to add image as attachment');
     }
   };
 
@@ -520,6 +671,7 @@ export default function NewChatPage() {
     window.localStorage.setItem(PROVIDER_STORAGE_KEY, nextProvider);
     setProvider(nextProvider);
     setSelectedFiles([]);
+    setSelectedImagePageNumber(null);
     setAttachmentError(null);
   };
 
@@ -599,6 +751,10 @@ export default function NewChatPage() {
                     60% { transform: translateX(-2px); }
                     80% { transform: translateX(2px); }
                   }
+                  @keyframes fadeInFromBlur {
+                    0% { filter: blur(8px); opacity: 0.3; }
+                    100% { filter: blur(0); opacity: 1; }
+                  }
                   .cozy-bg {
                     background: linear-gradient(120deg, rgba(14,165,233,0.18), rgba(20,184,166,0.22), rgba(139,92,246,0.20), rgba(244,114,182,0.18));
                     background-size: 300% 300%;
@@ -608,6 +764,7 @@ export default function NewChatPage() {
                   .cozy-spark { animation: sparkFloat 2.8s ease-out infinite; }
                   .cozy-twinkle { animation: twinkle 3s ease-in-out infinite; }
                   .fail-shake { animation: failShake 0.8s ease-in-out; }
+                  .fade-in-from-blur { animation: fadeInFromBlur 1.5s ease-out forwards; }
                 `}</style>
                 {assistantData.subTopics.map((subTopic, idx) => {
                   const targetPageNum = Number(subTopic.pageNumber || idx + 1);
@@ -617,15 +774,42 @@ export default function NewChatPage() {
                   const failedMsg = failedPages[targetPageNum];
 
                   if (existingImage) {
+                    const isSelected = selectedImagePageNumber === targetPageNum;
+                    const isRegenerating = regeneratingPageNumber === targetPageNum;
                     return (
-                      <img
-                        key={`page-${targetPageNum}`}
-                        ref={(el) => { imageRefs.current[targetPageNum - 1] = el; }}
-                        src={existingImage.filePath}
-                        alt={`Generated Page ${targetPageNum}`}
-                        loading="lazy"
-                        className="m-0 block h-auto w-full rounded-md border border-white/5 p-0 shadow-lg"
-                      />
+                      <div key={`page-${targetPageNum}`} className="relative">
+                        <img
+                          ref={(el) => { imageRefs.current[targetPageNum - 1] = el; }}
+                          src={existingImage.filePath}
+                          alt={`Generated Page ${targetPageNum}`}
+                          loading="lazy"
+                          className={`m-0 block h-auto w-full rounded-md border p-0 shadow-lg transition-all duration-1000 ${
+                            isRegenerating 
+                              ? 'blur-sm opacity-50 cursor-not-allowed border-white/5' 
+                              : isProcessing 
+                                ? 'cursor-not-allowed opacity-70 border-white/5' 
+                                : isSelected 
+                                  ? 'cursor-pointer border-teal-500/50 ring-2 ring-teal-500/30' 
+                                  : 'cursor-pointer border-white/5 hover:border-white/20'
+                          }`}
+                          onClick={() => !isProcessing && !isRegenerating && handleImageClick(existingImage)}
+                          title={isProcessing ? 'Cannot add images while generation is in progress' : isRegenerating ? 'Regenerating...' : isSelected ? 'Click to deselect' : 'Click to select for regeneration'}
+                        />
+                        {isRegenerating && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-md">
+                            <div className="flex items-center gap-2">
+                              <div className="h-2 w-2 animate-bounce rounded-full bg-teal-400" style={{ animationDelay: '0ms' }} />
+                              <div className="h-2 w-2 animate-bounce rounded-full bg-cyan-400" style={{ animationDelay: '150ms' }} />
+                              <div className="h-2 w-2 animate-bounce rounded-full bg-teal-300" style={{ animationDelay: '300ms' }} />
+                            </div>
+                          </div>
+                        )}
+                        {isSelected && !isProcessing && !isRegenerating && (
+                          <div className="absolute top-2 right-2 rounded bg-teal-500/90 px-2 py-1 text-xs font-medium text-white shadow-lg">
+                            Selected for regeneration
+                          </div>
+                        )}
+                      </div>
                     );
                   }
 
@@ -647,16 +831,45 @@ export default function NewChatPage() {
               </>
             ) : hasStartedGeneration && pageImages.length > 0 ? (
               <>
-                {pageImages.map((img, idx) => (
-                  <img
-                    key={idx}
-                    ref={(el) => { imageRefs.current[idx] = el; }}
-                    src={img.filePath}
-                    alt={`Generated Page ${img.pageNumber}`}
-                    loading="lazy"
-                    className="m-0 block h-auto w-full rounded-md border border-white/5 p-0 shadow-lg"
-                  />
-                ))}
+                {pageImages.map((img, idx) => {
+                  const isSelected = selectedImagePageNumber === img.pageNumber;
+                  const isRegenerating = regeneratingPageNumber === img.pageNumber;
+                  return (
+                    <div key={idx} className="relative">
+                      <img
+                        ref={(el) => { imageRefs.current[idx] = el; }}
+                        src={img.filePath}
+                        alt={`Generated Page ${img.pageNumber}`}
+                        loading="lazy"
+                        className={`m-0 block h-auto w-full rounded-md border p-0 shadow-lg transition-all duration-1000 ${
+                          isRegenerating 
+                            ? 'blur-sm opacity-50 cursor-not-allowed border-white/5' 
+                            : isProcessing 
+                              ? 'cursor-not-allowed opacity-70 border-white/5' 
+                              : isSelected 
+                                ? 'cursor-pointer border-teal-500/50 ring-2 ring-teal-500/30' 
+                                : 'cursor-pointer border-white/5 hover:border-white/20'
+                        }`}
+                        onClick={() => !isProcessing && !isRegenerating && handleImageClick(img)}
+                        title={isProcessing ? 'Cannot add images while generation is in progress' : isRegenerating ? 'Regenerating...' : isSelected ? 'Click to deselect' : 'Click to select for regeneration'}
+                      />
+                      {isRegenerating && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 animate-bounce rounded-full bg-teal-400" style={{ animationDelay: '0ms' }} />
+                            <div className="h-2 w-2 animate-bounce rounded-full bg-cyan-400" style={{ animationDelay: '150ms' }} />
+                            <div className="h-2 w-2 animate-bounce rounded-full bg-teal-300" style={{ animationDelay: '300ms' }} />
+                          </div>
+                        </div>
+                      )}
+                      {isSelected && !isProcessing && !isRegenerating && (
+                        <div className="absolute top-2 right-2 rounded bg-teal-500/90 px-2 py-1 text-xs font-medium text-white shadow-lg">
+                          Selected for regeneration
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 
                 {/* Failed Pages Retry Section */}
                 {failedPagesData.length > 0 && (
@@ -721,6 +934,9 @@ export default function NewChatPage() {
           onSendPrompt={sendPrompt}
           onFileChange={handleFileChange}
           onKeyDown={handleKeyDown}
+          onRemoveFile={handleRemoveFile}
+          selectedImagePageNumber={selectedImagePageNumber}
+          onDeselectImage={handleDeselectImage}
         />
       </div>
     </div>

@@ -515,6 +515,28 @@ if you are done with your question, send this json
 
 ---
 
+### Image Regeneration
+As an AI, you can make mistakes so user can send you an image and a json or a text for edit.
+
+json format:
+```json
+{
+    "status":"regenerate",
+    "subTopics":[],
+    "pageNumber":"",
+    "edit":"<USER_DESIRED_EDIT_HERE>",
+    "image": {
+    "base64": "...",
+    "filename": "page-1.png",
+    "mimeType": "image/png",
+    "fileSize": 12345
+  }
+}
+```
+---
+
+---
+
 ### Info
 
 If you understand this new instructions to follow, respond by
