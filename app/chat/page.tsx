@@ -62,9 +62,13 @@ export default function NewChatPage() {
     }
 
     if (pageImages.length > 0) {
-      md += `## Pages\n\n`;
+      md += `## Pages & Diagrams\n\n`;
       pageImages.forEach((img) => {
-        md += `### Page ${img.pageNumber}\n\n![Page ${img.pageNumber}](${img.filePath})\n\n`;
+        const targetSubTopic = subTopics.find((st) => Number(st.pageNumber) === img.pageNumber);
+        const name = targetSubTopic ? (Array.isArray(targetSubTopic.names) ? targetSubTopic.names.join(' - ') : String(targetSubTopic.names)) : `Page ${img.pageNumber}`;
+        md += `### Page ${img.pageNumber}: ${name}\n\n`;
+        md += `#### Note Page Image\n![Page ${img.pageNumber}](${img.filePath})\n\n`;
+        md += `#### Visual Diagram Asset\n> **Diagram Schematic (Page ${img.pageNumber})**: Visual diagrams, flowcharts, and structural schematics.\n\n![Diagram Page ${img.pageNumber}](${img.filePath})\n\n`;
       });
     }
 

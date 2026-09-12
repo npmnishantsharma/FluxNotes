@@ -21,14 +21,16 @@ export function generateNoteMarkdown(note: Partial<NoteRecord>): string {
   }
 
   if (Array.isArray(note.images) && note.images.length > 0) {
-    markdown += `## Generated Note Pages\n\n`;
+    markdown += `## Generated Note Pages & Diagrams\n\n`;
     note.images.forEach((img, index) => {
       const pageNum = typeof img === 'object' && img.pageNumber ? img.pageNumber : index + 1;
       const targetSubTopic = subTopics.find((st) => Number(st.pageNumber) === pageNum);
       const names = targetSubTopic ? (Array.isArray(targetSubTopic.names) ? targetSubTopic.names.join(' - ') : targetSubTopic.names) : `Page ${pageNum}`;
 
       markdown += `### Page ${pageNum}: ${names}\n\n`;
-      markdown += `![Page ${pageNum} Image](fnd://${note.topicId || 'topic'}/${pageNum})\n\n`;
+      markdown += `![Page ${pageNum} Note Image](fnd://${note.topicId || 'topic'}/${pageNum})\n\n`;
+      markdown += `> **Diagram Asset (Page ${pageNum})**: Visual schematic representation for ${names}\n\n`;
+      markdown += `![Page ${pageNum} Diagram Asset](fnd://${note.topicId || 'topic'}/${pageNum})\n\n`;
     });
   }
 
