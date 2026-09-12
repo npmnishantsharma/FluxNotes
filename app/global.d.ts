@@ -47,6 +47,17 @@ declare global {
       getLogs: () => Promise<{ success: boolean; logs?: string; error?: string }>;
       clearLogs: () => Promise<{ success: boolean; error?: string }>;
       convertLocalImageToBase64: (filePath: string) => Promise<{ success: boolean; base64?: string; mimeType?: string; error?: string }>;
+      fnInspector?: {
+        list: () => Promise<Array<{ uid: string; fileName: string; filePath: string; topicName: string; fileSize: number; updatedTimestamp: number }>>;
+        inspect: (topicUid: string) => Promise<any>;
+        getPage: (topicUid: string, pageNumber: number) => Promise<any>;
+        getChunks: (topicUid: string) => Promise<any[]>;
+        getEmbedding: (topicUid: string, chunkId: string) => Promise<any>;
+        getRelationships: (topicUid: string) => Promise<any[]>;
+        search: (query: string, options?: any) => Promise<{ results: any[]; queryEmbedding: any }>;
+        validate: (topicUid: string) => Promise<any>;
+        getBinaryInfo: (topicUid: string) => Promise<any>;
+      };
     };
   }
 }

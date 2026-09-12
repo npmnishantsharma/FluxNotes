@@ -21,6 +21,7 @@ import {
 } from '../utils/helpers';
 import { CHATGPT_URL, GEMINI_SIGN_IN_URL } from '../windows';
 import { getLogs, clearLogs } from '../utils/logger';
+import { saveNoteToFn, deleteFnFile } from '../utils/fnStorage';
 
 export function registerNotesIpcHandlers(
   getMainWindow: () => BrowserWindow | null,
@@ -123,6 +124,13 @@ export function registerNotesIpcHandlers(
     }
 
     await saveNotesCollection(notes);
+
+    try {
+      await saveNoteToFn(fullNoteRecord);
+    } catch (fnErr) {
+      console.warn('[save-note] Failed to write .fn binary file:', fnErr);
+    }
+
     return true;
   });
 
@@ -177,6 +185,13 @@ export function registerNotesIpcHandlers(
     const removedPaths = new Set(removableImagePaths);
     const records = await getStoredRecords();
     await saveImageRecords(records.filter((record) => !removedPaths.has(record.filePath)));
+
+    try {
+      await deleteFnFile(topicId);
+    } catch (fnErr) {
+      console.warn('[delete-note] Failed to delete .fn binary file:', fnErr);
+    }
+
     return { success: true };
   });
 

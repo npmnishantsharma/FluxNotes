@@ -12,6 +12,7 @@ const storage_1 = require("../utils/storage");
 const gemini_1 = require("./gemini");
 const chatgpt_1 = require("./chatgpt");
 const logger_1 = require("../utils/logger");
+const retrieval_1 = require("./retrieval");
 async function processAiPrompt(workerWindow, mainWindow, userText, provider, activeSessionId, activeSession, isGeminiSessionInitialized, attachments) {
     const sessionId = activeSessionId || (0, helpers_1.createChatSessionId)();
     let session = activeSession || { conversationId: null, parentMessageId: null };
@@ -21,6 +22,10 @@ async function processAiPrompt(workerWindow, mainWindow, userText, provider, act
         const promptPath = path_1.default.join(__dirname, '..', '..', 'prompt.md');
         if (fs_1.default.existsSync(promptPath)) {
             promptContent = fs_1.default.readFileSync(promptPath, 'utf-8');
+        }
+        const ragContext = await (0, retrieval_1.buildRagContext)(userText);
+        if (ragContext) {
+            promptContent = `${promptContent}\n\n${ragContext}`;
         }
     }
     catch (error) {
