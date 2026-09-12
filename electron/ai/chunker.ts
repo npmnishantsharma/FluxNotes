@@ -8,6 +8,7 @@ import {
 } from '../utils/fnFormat';
 import { fromLocalImageUrl } from '../utils/helpers';
 import { analyzeImageOcrAndDiagrams } from './ocr';
+import { generateNoteMarkdown } from '../utils/markdownGenerator';
 
 export interface ChunkingResult {
   pages: FnPage[];
@@ -180,9 +181,18 @@ export function chunkNoteRecord(note: NoteRecord): ChunkingResult {
       });
     });
 
+    const pageMarkdown = generateNoteMarkdown({
+      topicId: topicUid,
+      topicName,
+      subTopics: pageSubTopics,
+      aiResponse: rawResponseText,
+      images: pageImages.map((img) => ({ filePath: img.filePath, pageNumber: img.pageNumber })),
+    });
+
     const pageRecord: FnPage = {
       pageNumber: pageNum,
       text: sectionContent,
+      markdown: pageMarkdown,
       headings,
       sections: [{ title: sectionTitle, content: sectionContent }],
       subTopics: pageSubTopics.map((st: SubTopic) => ({ names: st.names, pageNumber: st.pageNumber })),

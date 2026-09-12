@@ -213,6 +213,26 @@ app.whenReady().then(async () => {
     callback({ path: decodedPath });
   });
 
+  protocol.registerBufferProtocol('fnd', async (request, callback) => {
+    try {
+      const url = request.url.replace(/^fnd:\/\//, '');
+      const parts = url.split('/');
+      const topicId = parts[0];
+      const pageNumber = parseInt(parts[1] || '1', 10);
+
+      const { getFndImagePage } = await import('./utils/fndStorage');
+      const result = await getFndImagePage(topicId, pageNumber);
+      if (result) {
+        callback({ mimeType: result.mimeType, data: result.buffer });
+      } else {
+        callback({ statusCode: 404 });
+      }
+    } catch (err) {
+      console.error('[Protocol fnd://] Error serving fnd image:', err);
+      callback({ statusCode: 500 });
+    }
+  });
+
   registerWindowControlListeners();
   registerNotesIpcHandlers(getMainWindow, getWorkerWindow, getSelectedProvider, sessionState);
   registerUpdaterHandlers(getMainWindow);

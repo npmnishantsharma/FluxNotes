@@ -7,6 +7,7 @@ export interface ImageOcrResult {
   extractedText: string;
   diagramDescription: string;
   diagramLabels: string[];
+  diagramText: string;
   hasDiagram: boolean;
 }
 
@@ -66,6 +67,7 @@ export function analyzeImageOcrAndDiagrams(
       extractedText: `[OCR Page ${pageNumber}] Visual image representation on page ${pageNumber}`,
       diagramDescription: baseDiagramDesc,
       diagramLabels: ['diagram', 'schematic', 'visual-notes'],
+      diagramText: 'Visual diagram components and schematic labels',
       hasDiagram: true,
     };
   }
@@ -106,12 +108,30 @@ export function analyzeImageOcrAndDiagrams(
     console.warn(`[OCR] Error reading image buffer at '${filePath}':`, err);
   }
 
-  const extractedText = extractedTextLines.length > 0
-    ? extractedTextLines.join(' | ')
-    : `[OCR Page ${pageNumber}] Extracted OCR text content from image ${path.basename(filePath)}`;
+  // Separate diagram labels / diagram callout text from main body OCR text
+  const isDiagramText = (line: string) => {
+    const trimmed = line.trim();
+    // Labels, short titles, arrows, chemical/math formulas or figure captions are diagram elements
+    return (
+      trimmed.length <= 25 ||
+      /^(fig|figure|diagram|schematic|label|step|node|box|table|chart|legend):/i.test(trimmed) ||
+      /->|-->|=>|~>/.test(trimmed)
+    );
+  };
+
+  const bodyOcrLines = extractedTextLines.filter((line) => !isDiagramText(line));
+  const diagramOcrLines = extractedTextLines.filter((line) => isDiagramText(line));
+
+  const extractedText = bodyOcrLines.length > 0
+    ? bodyOcrLines.join(' | ')
+    : `[OCR Page ${pageNumber}] Main text content on page ${pageNumber}`;
+
+  const diagramText = diagramOcrLines.length > 0
+    ? diagramOcrLines.join(', ')
+    : 'Visual diagram components and schematic labels';
 
   const finalDiagramLabels = Array.from(
-    new Set(['diagram', 'schematic', `page-${pageNumber}`, ...diagramLabels.slice(0, 5)]),
+    new Set(['diagram', 'schematic', `page-${pageNumber}`, ...diagramLabels.slice(0, 5), ...diagramOcrLines.slice(0, 5)]),
   );
 
   return {
@@ -119,6 +139,7 @@ export function analyzeImageOcrAndDiagrams(
     extractedText,
     diagramDescription: baseDiagramDesc,
     diagramLabels: finalDiagramLabels,
+    diagramText,
     hasDiagram: true,
   };
 }

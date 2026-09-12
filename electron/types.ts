@@ -89,7 +89,7 @@ export type AIProvider = 'chatgpt' | 'gemini';
 export interface ExportNoteOptions {
   images: string[];
   topicName: string;
-  format: 'pdf' | 'png' | 'jpeg';
+  format: 'pdf' | 'png' | 'jpeg' | 'md';
 }
 
 export interface RawResponseData {

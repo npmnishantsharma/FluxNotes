@@ -15,6 +15,7 @@ const fnFormat_1 = require("./fnFormat");
 const storage_1 = require("./storage");
 const chunker_1 = require("../ai/chunker");
 const embeddings_1 = require("../ai/embeddings");
+const fndStorage_1 = require("./fndStorage");
 function getFnTopicsDir() {
     const userDataPath = electron_1.app?.getPath ? electron_1.app.getPath('userData') : process.cwd();
     return path_1.default.join(userDataPath, 'fn_topics');
@@ -82,6 +83,12 @@ async function saveNoteToFn(note) {
         },
     };
     await (0, fnFormat_1.writeFnFile)(fnPath, fnContent);
+    try {
+        await (0, fndStorage_1.saveNoteImagesToFnd)(note);
+    }
+    catch (fndErr) {
+        console.warn(`[fnStorage] Failed to save note images to .fnd container for '${topicId}':`, fndErr);
+    }
 }
 /**
  * Deletes the `.fn` binary container for a topic.
@@ -111,13 +118,16 @@ async function ensureAllNotesSyncedToFn() {
             if (!note.topicId)
                 continue;
             const fnPath = getFnFilePath(note.topicId);
-            if (!fs_1.default.existsSync(fnPath)) {
-                console.log(`[fnStorage] Syncing existing note '${note.topicName}' (${note.topicId}) to .fn binary container...`);
+            const fndPath = (0, fndStorage_1.getFndFilePath)(note.topicId);
+            const needsFnSync = !fs_1.default.existsSync(fnPath);
+            const needsFndSync = !fs_1.default.existsSync(fndPath);
+            if (needsFnSync || needsFndSync) {
+                console.log(`[fnStorage] Syncing existing note '${note.topicName}' (${note.topicId}) into .fn / .fnd binary containers & running OCR...`);
                 await saveNoteToFn(note);
             }
         }
     }
     catch (err) {
-        console.error('[fnStorage] Error syncing existing notes to .fn containers:', err);
+        console.error('[fnStorage] Error syncing existing notes to .fn and .fnd containers:', err);
     }
 }
