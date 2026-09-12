@@ -7,6 +7,7 @@ import { writeRawResponse, appendToResultJson, saveRecordToDb, saveFailedPage, i
 import { injectGeminiEngineIfNeeded, downloadGeminiImages } from './gemini';
 import { injectChatGptEngineIfNeeded } from './chatgpt';
 import { logError } from '../utils/logger';
+import { buildRagContext } from './retrieval';
 
 export async function processAiPrompt(
   workerWindow: BrowserWindow,
@@ -37,6 +38,11 @@ export async function processAiPrompt(
     const promptPath = path.join(__dirname, '..', '..', 'prompt.md');
     if (fs.existsSync(promptPath)) {
       promptContent = fs.readFileSync(promptPath, 'utf-8');
+    }
+
+    const ragContext = await buildRagContext(userText);
+    if (ragContext) {
+      promptContent = `${promptContent}\n\n${ragContext}`;
     }
   } catch (error) {
     const err = error as Error;
