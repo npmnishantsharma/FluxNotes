@@ -1,4 +1,4 @@
-import { ipcMain, app } from 'electron';
+import { ipcMain } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import {
@@ -11,12 +11,7 @@ import { getFnTopicsDir, getFnFilePath } from '../utils/fnStorage';
 import { retrieve, RetrieveOptions } from '../ai/retrieval';
 
 export function registerFnInspectorIpcHandlers(): void {
-  // Check development mode
-  const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
-
   ipcMain.handle('fn-list', async () => {
-    if (!isDev) return [];
-
     const fnDir = getFnTopicsDir();
     if (!fs.existsSync(fnDir)) return [];
 
@@ -59,7 +54,6 @@ export function registerFnInspectorIpcHandlers(): void {
   });
 
   ipcMain.handle('fn-inspect', async (_, topicUid: string) => {
-    if (!isDev) return null;
     const filePath = getFnFilePath(topicUid);
     if (!fs.existsSync(filePath)) return null;
 
@@ -72,7 +66,6 @@ export function registerFnInspectorIpcHandlers(): void {
   });
 
   ipcMain.handle('fn-get-page', async (_, topicUid: string, pageNumber: number) => {
-    if (!isDev) return null;
     const filePath = getFnFilePath(topicUid);
     if (!fs.existsSync(filePath)) return null;
 
@@ -85,7 +78,6 @@ export function registerFnInspectorIpcHandlers(): void {
   });
 
   ipcMain.handle('fn-get-chunks', async (_, topicUid: string) => {
-    if (!isDev) return [];
     const filePath = getFnFilePath(topicUid);
     if (!fs.existsSync(filePath)) return [];
 
@@ -98,7 +90,6 @@ export function registerFnInspectorIpcHandlers(): void {
   });
 
   ipcMain.handle('fn-get-embedding', async (_, topicUid: string, chunkId: string) => {
-    if (!isDev) return null;
     const filePath = getFnFilePath(topicUid);
     if (!fs.existsSync(filePath)) return null;
 
@@ -111,7 +102,6 @@ export function registerFnInspectorIpcHandlers(): void {
   });
 
   ipcMain.handle('fn-get-relationships', async (_, topicUid: string) => {
-    if (!isDev) return [];
     const filePath = getFnFilePath(topicUid);
     if (!fs.existsSync(filePath)) return [];
 
@@ -124,7 +114,6 @@ export function registerFnInspectorIpcHandlers(): void {
   });
 
   ipcMain.handle('fn-search', async (_, query: string, options: RetrieveOptions = {}) => {
-    if (!isDev) return { results: [], queryEmbedding: null };
     try {
       return await retrieve(query, options);
     } catch (err) {
@@ -134,7 +123,6 @@ export function registerFnInspectorIpcHandlers(): void {
   });
 
   ipcMain.handle('fn-validate', async (_, topicUid: string) => {
-    if (!isDev) return null;
     const filePath = getFnFilePath(topicUid);
     if (!fs.existsSync(filePath)) return null;
 
@@ -162,7 +150,6 @@ export function registerFnInspectorIpcHandlers(): void {
   });
 
   ipcMain.handle('fn-get-binary-info', async (_, topicUid: string) => {
-    if (!isDev) return null;
     const filePath = getFnFilePath(topicUid);
     if (!fs.existsSync(filePath)) return null;
 

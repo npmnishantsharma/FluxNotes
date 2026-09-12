@@ -132,7 +132,6 @@ interface SearchResponseData {
 }
 
 export default function FnInspectorPage() {
-  const [isDev] = useState<boolean>(() => process.env.NODE_ENV === 'development');
   const [topicList, setTopicList] = useState<TopicItem[]>([]);
   const [selectedUid, setSelectedUid] = useState<string>('');
   const [fnContent, setFnContent] = useState<FnContentData | null>(null);
@@ -146,8 +145,6 @@ export default function FnInspectorPage() {
   const [copied, setCopied] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!isDev) return;
-
     const loadTopicList = async () => {
       if (window.electronAPI?.fnInspector?.list) {
         const list = await window.electronAPI.fnInspector.list();
@@ -159,7 +156,7 @@ export default function FnInspectorPage() {
     };
 
     void loadTopicList();
-  }, [isDev, selectedUid]);
+  }, []);
 
   useEffect(() => {
     if (!selectedUid || !window.electronAPI?.fnInspector) return;
@@ -178,16 +175,7 @@ export default function FnInspectorPage() {
     void loadData();
   }, [selectedUid]);
 
-  if (isDev === false) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-gray-950 text-white">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-500">Access Denied</h1>
-          <p className="mt-2 text-gray-400">The FN Inspector developer tool is only available in development mode.</p>
-        </div>
-      </div>
-    );
-  }
+
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
