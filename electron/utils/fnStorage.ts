@@ -9,6 +9,7 @@ import {
   CURRENT_SCHEMA_VERSION,
   FN_MAGIC,
 } from './fnFormat';
+import { getStoredNotes } from './storage';
 import { chunkNoteRecord } from '../ai/chunker';
 import { reindexTopicEmbeddings, HttpEmbeddingProvider } from '../ai/embeddings';
 
@@ -100,5 +101,26 @@ export async function deleteFnFile(topicId: string): Promise<void> {
     } catch (err) {
       console.error(`[fnStorage] Failed to delete .fn file '${fnPath}':`, err);
     }
+  }
+}
+
+/**
+ * Ensures all existing notes from notes_data.json have a corresponding .fn binary container file.
+ */
+export async function ensureAllNotesSyncedToFn(): Promise<void> {
+  try {
+    const notes = await getStoredNotes();
+    if (!Array.isArray(notes) || notes.length === 0) return;
+
+    for (const note of notes) {
+      if (!note.topicId) continue;
+      const fnPath = getFnFilePath(note.topicId);
+      if (!fs.existsSync(fnPath)) {
+        console.log(`[fnStorage] Syncing existing note '${note.topicName}' (${note.topicId}) to .fn binary container...`);
+        await saveNoteToFn(note);
+      }
+    }
+  } catch (err) {
+    console.error('[fnStorage] Error syncing existing notes to .fn containers:', err);
   }
 }

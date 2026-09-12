@@ -7,10 +7,12 @@ exports.getFnTopicsDir = getFnTopicsDir;
 exports.getFnFilePath = getFnFilePath;
 exports.saveNoteToFn = saveNoteToFn;
 exports.deleteFnFile = deleteFnFile;
+exports.ensureAllNotesSyncedToFn = ensureAllNotesSyncedToFn;
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const electron_1 = require("electron");
 const fnFormat_1 = require("./fnFormat");
+const storage_1 = require("./storage");
 const chunker_1 = require("../ai/chunker");
 const embeddings_1 = require("../ai/embeddings");
 function getFnTopicsDir() {
@@ -95,5 +97,27 @@ async function deleteFnFile(topicId) {
         catch (err) {
             console.error(`[fnStorage] Failed to delete .fn file '${fnPath}':`, err);
         }
+    }
+}
+/**
+ * Ensures all existing notes from notes_data.json have a corresponding .fn binary container file.
+ */
+async function ensureAllNotesSyncedToFn() {
+    try {
+        const notes = await (0, storage_1.getStoredNotes)();
+        if (!Array.isArray(notes) || notes.length === 0)
+            return;
+        for (const note of notes) {
+            if (!note.topicId)
+                continue;
+            const fnPath = getFnFilePath(note.topicId);
+            if (!fs_1.default.existsSync(fnPath)) {
+                console.log(`[fnStorage] Syncing existing note '${note.topicName}' (${note.topicId}) to .fn binary container...`);
+                await saveNoteToFn(note);
+            }
+        }
+    }
+    catch (err) {
+        console.error('[fnStorage] Error syncing existing notes to .fn containers:', err);
     }
 }

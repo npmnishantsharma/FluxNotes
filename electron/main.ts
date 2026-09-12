@@ -11,6 +11,7 @@ import {
 import { registerNotesIpcHandlers } from './ipc/notes';
 import { registerUpdaterHandlers } from './ipc/updater';
 import { registerFnInspectorIpcHandlers } from './ipc/fnInspector';
+import { ensureAllNotesSyncedToFn } from './utils/fnStorage';
 import { processAiPrompt } from './ai';
 import { AIProvider, ChatSession } from './types';
 import { getApiToken, startApiServer, stopApiServer } from './api';
@@ -216,6 +217,8 @@ app.whenReady().then(async () => {
   registerNotesIpcHandlers(getMainWindow, getWorkerWindow, getSelectedProvider, sessionState);
   registerUpdaterHandlers(getMainWindow);
   registerFnInspectorIpcHandlers();
+
+  void ensureAllNotesSyncedToFn();
 
   createWindows(resetSessionState);
 });
