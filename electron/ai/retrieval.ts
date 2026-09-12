@@ -51,7 +51,7 @@ export function getFnTopicsDir(): string {
 }
 
 /**
- * Searches across one or multiple `.fn` files using cosine similarity.
+ * Searches across all `.fn` files simultaneously using cosine similarity.
  */
 export async function retrieve(
   query: string,
@@ -79,62 +79,72 @@ export async function retrieve(
     const files = await fs.promises.readdir(fnDir);
     const fnFiles = files.filter((f) => f.endsWith('.fn'));
 
-    for (const fileName of fnFiles) {
-      const filePath = path.join(fnDir, fileName);
-      try {
-        const fnContent: FnFileContent = await readFnFile(filePath);
-        const fileUid = fnContent.header.topicUid || fnContent.topic.topicId;
-
-        if (targetUid && fileUid !== targetUid && !fileName.includes(targetUid)) {
-          continue;
+    // Load all .fn files concurrently at once
+    const fnContents = await Promise.all(
+      fnFiles.map(async (fileName) => {
+        const filePath = path.join(fnDir, fileName);
+        try {
+          const fnContent: FnFileContent = await readFnFile(filePath);
+          return { fileName, fnContent };
+        } catch (fileErr) {
+          console.warn(`[RAG Retrieval] Could not process .fn file '${fileName}':`, fileErr);
+          return null;
         }
+      }),
+    );
 
-        const topicName = fnContent.topic.topicName || 'Untitled Topic';
-        const chunksMap = new Map(
-          (fnContent.semantic?.chunks || []).map((c) => [c.id, c]),
-        );
-        const relationships = fnContent.semantic?.relationships || [];
-        const assets = fnContent.assets?.images || [];
-        const embeddings = fnContent.rag?.embeddings || [];
+    for (const item of fnContents) {
+      if (!item) continue;
+      const { fileName, fnContent } = item;
+      const fileUid = fnContent.header.topicUid || fnContent.topic.topicId;
 
-        for (const emb of embeddings) {
-          if (!emb.vector || emb.vector.length === 0) continue;
+      if (targetUid && fileUid !== targetUid && !fileName.includes(targetUid)) {
+        continue;
+      }
 
-          const simScore = cosineSimilarity(queryVector, emb.vector);
-          if (simScore >= minScore) {
-            const chunk = chunksMap.get(emb.chunkId);
-            const chunkText = chunk ? chunk.text : '';
-            const pageNum = chunk ? chunk.pageNumber : emb.source?.pageNumber || 1;
-            const sectionName = chunk ? chunk.section : emb.source?.section || 'General';
-            const sourceType = chunk ? chunk.sourceType : 'text';
+      const topicName = fnContent.topic.topicName || 'Untitled Topic';
+      const chunksMap = new Map(
+        (fnContent.semantic?.chunks || []).map((c) => [c.id, c]),
+      );
+      const relationships = fnContent.semantic?.relationships || [];
+      const assets = fnContent.assets?.images || [];
+      const embeddings = fnContent.rag?.embeddings || [];
 
-            // Gather relationships relevant to this chunk or page
-            const relatedRels = relationships.filter(
-              (r) => r.fromId === emb.chunkId || r.toId === emb.chunkId || r.fromId === `page-${fileUid}-p${pageNum}`,
-            );
-            const relatedAssets = assets.filter((a) => a.pageNumber === pageNum);
+      for (const emb of embeddings) {
+        if (!emb.vector || emb.vector.length === 0) continue;
 
-            candidates.push({
-              rank: 0,
-              similarityScore: simScore,
-              chunkId: emb.chunkId,
-              topicUid: fileUid,
-              topicName,
-              pageNumber: pageNum,
-              section: sectionName,
-              sourceType,
-              text: chunkText,
-              embeddingId: emb.id,
-              vector: emb.vector,
-              relatedInformation: {
-                relationships: relatedRels,
-                assets: relatedAssets,
-              },
-            });
-          }
+        const simScore = cosineSimilarity(queryVector, emb.vector);
+        if (simScore >= minScore) {
+          const chunk = chunksMap.get(emb.chunkId);
+          const chunkText = chunk ? chunk.text : '';
+          const pageNum = chunk ? chunk.pageNumber : emb.source?.pageNumber || 1;
+          const sectionName = chunk ? chunk.section : emb.source?.section || 'General';
+          const sourceType = chunk ? chunk.sourceType : 'text';
+
+          // Gather relationships relevant to this chunk or page
+          const relatedRels = relationships.filter(
+            (r) => r.fromId === emb.chunkId || r.toId === emb.chunkId || r.fromId === `page-${fileUid}-p${pageNum}`,
+          );
+          const relatedAssets = assets.filter((a) => a.pageNumber === pageNum);
+
+          candidates.push({
+            rank: 0,
+            similarityScore: simScore,
+            chunkId: emb.chunkId,
+            topicUid: fileUid,
+            topicName,
+            pageNumber: pageNum,
+            section: sectionName,
+            sourceType,
+            text: chunkText,
+            embeddingId: emb.id,
+            vector: emb.vector,
+            relatedInformation: {
+              relationships: relatedRels,
+              assets: relatedAssets,
+            },
+          });
         }
-      } catch (fileErr) {
-        console.warn(`[RAG Retrieval] Could not process .fn file '${fileName}':`, fileErr);
       }
     }
   }
