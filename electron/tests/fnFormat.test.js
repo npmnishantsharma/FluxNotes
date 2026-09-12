@@ -167,6 +167,38 @@ async function runTests() {
     assert_1.default.strictEqual(embeddings2.length, embeddings1.length);
     assert_1.default.strictEqual(embeddings2[0].id, embeddings1[0].id, 'Unchanged chunk should reuse embedding');
     console.log('  ✓ Passed\n');
+    // Test 6: Obfuscation of JSON Structure in .fn File
+    console.log('Test 6: Hex Obfuscation of JSON Payload Structure...');
+    const serialized = (0, fnFormat_1.serializeFn)(sampleContent);
+    // Extract payload section buffer (beyond the 64-byte binary header)
+    const payloadSectionBuf = serialized.subarray(64, serialized.length - 32);
+    const payloadStr = payloadSectionBuf.toString('ascii');
+    // Verify no raw JSON object brackets exist in section payloads
+    assert_1.default.strictEqual(payloadStr.includes('{"topicId"'), false, 'Serialized payloads must not contain plain JSON syntax');
+    assert_1.default.strictEqual(payloadStr.includes('"topicName"'), false, 'Serialized payloads must not expose field names in plaintext');
+    // Verify deserialization decodes payload properly
+    const decodedContent = (0, fnFormat_1.deserializeFn)(serialized);
+    assert_1.default.strictEqual(decodedContent.topic.topicId, sampleContent.topic.topicId);
+    console.log('  ✓ Passed\n');
+    // Test 7: OCR Text & Diagram Chunking Separation
+    console.log('Test 7: OCR Text & Diagram Separation in Chunker...');
+    const noteWithImage = {
+        topicId: 'topic-ocr-diagram-1',
+        topicName: 'Solar Panel System',
+        aiResponse: 'Solar panels convert sunlight to electricity.',
+        subTopics: [{ names: ['Photovoltaic Effect'], pageNumber: 1 }],
+        images: [{ filePath: '/non/existent/diagram_solar.png', pageNumber: 1 }],
+    };
+    const ocrChunkResult = (0, chunker_1.chunkNoteRecord)(noteWithImage);
+    assert_1.default.ok(ocrChunkResult.chunks.some((c) => c.sourceType === 'ocr'), 'Must contain separate OCR sourceType chunk');
+    assert_1.default.ok(ocrChunkResult.chunks.some((c) => c.sourceType === 'diagram'), 'Must contain separate Diagram sourceType chunk');
+    const ocrChunk = ocrChunkResult.chunks.find((c) => c.sourceType === 'ocr');
+    const diagramChunk = ocrChunkResult.chunks.find((c) => c.sourceType === 'diagram');
+    assert_1.default.ok(ocrChunk.text.length > 0, 'OCR chunk must contain extracted text');
+    assert_1.default.ok(diagramChunk.text.length > 0, 'Diagram chunk must contain diagram description');
+    assert_1.default.ok(ocrChunkResult.relationships.some((r) => r.type === 'derived_from' && r.fromId === ocrChunk.id), 'Must contain relationship linking OCR chunk to image asset');
+    assert_1.default.ok(ocrChunkResult.relationships.some((r) => r.type === 'illustrates' && r.fromId === diagramChunk.id), 'Must contain relationship linking Diagram chunk to image asset');
+    console.log('  ✓ Passed\n');
     console.log('✅ ALL TESTS PASSED SUCCESSFULLY!');
 }
 runTests().catch((err) => {

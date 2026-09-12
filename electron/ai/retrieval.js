@@ -16,7 +16,7 @@ function getFnTopicsDir() {
     return path_1.default.join(userData, 'fn_topics');
 }
 /**
- * Searches across one or multiple `.fn` files using cosine similarity.
+ * Searches across all `.fn` files simultaneously using cosine similarity.
  */
 async function retrieve(query, options = {}, provider) {
     const activeProvider = provider || new embeddings_1.HttpEmbeddingProvider();
@@ -35,54 +35,62 @@ async function retrieve(query, options = {}, provider) {
     if (fs_1.default.existsSync(fnDir)) {
         const files = await fs_1.default.promises.readdir(fnDir);
         const fnFiles = files.filter((f) => f.endsWith('.fn'));
-        for (const fileName of fnFiles) {
+        // Load all .fn files concurrently at once
+        const fnContents = await Promise.all(fnFiles.map(async (fileName) => {
             const filePath = path_1.default.join(fnDir, fileName);
             try {
                 const fnContent = await (0, fnFormat_1.readFnFile)(filePath);
-                const fileUid = fnContent.header.topicUid || fnContent.topic.topicId;
-                if (targetUid && fileUid !== targetUid && !fileName.includes(targetUid)) {
-                    continue;
-                }
-                const topicName = fnContent.topic.topicName || 'Untitled Topic';
-                const chunksMap = new Map((fnContent.semantic?.chunks || []).map((c) => [c.id, c]));
-                const relationships = fnContent.semantic?.relationships || [];
-                const assets = fnContent.assets?.images || [];
-                const embeddings = fnContent.rag?.embeddings || [];
-                for (const emb of embeddings) {
-                    if (!emb.vector || emb.vector.length === 0)
-                        continue;
-                    const simScore = (0, embeddings_1.cosineSimilarity)(queryVector, emb.vector);
-                    if (simScore >= minScore) {
-                        const chunk = chunksMap.get(emb.chunkId);
-                        const chunkText = chunk ? chunk.text : '';
-                        const pageNum = chunk ? chunk.pageNumber : emb.source?.pageNumber || 1;
-                        const sectionName = chunk ? chunk.section : emb.source?.section || 'General';
-                        const sourceType = chunk ? chunk.sourceType : 'text';
-                        // Gather relationships relevant to this chunk or page
-                        const relatedRels = relationships.filter((r) => r.fromId === emb.chunkId || r.toId === emb.chunkId || r.fromId === `page-${fileUid}-p${pageNum}`);
-                        const relatedAssets = assets.filter((a) => a.pageNumber === pageNum);
-                        candidates.push({
-                            rank: 0,
-                            similarityScore: simScore,
-                            chunkId: emb.chunkId,
-                            topicUid: fileUid,
-                            topicName,
-                            pageNumber: pageNum,
-                            section: sectionName,
-                            sourceType,
-                            text: chunkText,
-                            embeddingId: emb.id,
-                            vector: emb.vector,
-                            relatedInformation: {
-                                relationships: relatedRels,
-                                assets: relatedAssets,
-                            },
-                        });
-                    }
-                }
+                return { fileName, fnContent };
             }
             catch (fileErr) {
                 console.warn(`[RAG Retrieval] Could not process .fn file '${fileName}':`, fileErr);
+                return null;
+            }
+        }));
+        for (const item of fnContents) {
+            if (!item)
+                continue;
+            const { fileName, fnContent } = item;
+            const fileUid = fnContent.header.topicUid || fnContent.topic.topicId;
+            if (targetUid && fileUid !== targetUid && !fileName.includes(targetUid)) {
+                continue;
+            }
+            const topicName = fnContent.topic.topicName || 'Untitled Topic';
+            const chunksMap = new Map((fnContent.semantic?.chunks || []).map((c) => [c.id, c]));
+            const relationships = fnContent.semantic?.relationships || [];
+            const assets = fnContent.assets?.images || [];
+            const embeddings = fnContent.rag?.embeddings || [];
+            for (const emb of embeddings) {
+                if (!emb.vector || emb.vector.length === 0)
+                    continue;
+                const simScore = (0, embeddings_1.cosineSimilarity)(queryVector, emb.vector);
+                if (simScore >= minScore) {
+                    const chunk = chunksMap.get(emb.chunkId);
+                    const chunkText = chunk ? chunk.text : '';
+                    const pageNum = chunk ? chunk.pageNumber : emb.source?.pageNumber || 1;
+                    const sectionName = chunk ? chunk.section : emb.source?.section || 'General';
+                    const sourceType = chunk ? chunk.sourceType : 'text';
+                    // Gather relationships relevant to this chunk or page
+                    const relatedRels = relationships.filter((r) => r.fromId === emb.chunkId || r.toId === emb.chunkId || r.fromId === `page-${fileUid}-p${pageNum}`);
+                    const relatedAssets = assets.filter((a) => a.pageNumber === pageNum);
+                    candidates.push({
+                        rank: 0,
+                        similarityScore: simScore,
+                        chunkId: emb.chunkId,
+                        topicUid: fileUid,
+                        topicName,
+                        pageNumber: pageNum,
+                        section: sectionName,
+                        sourceType,
+                        text: chunkText,
+                        embeddingId: emb.id,
+                        vector: emb.vector,
+                        relatedInformation: {
+                            relationships: relatedRels,
+                            assets: relatedAssets,
+                        },
+                    });
+                }
             }
         }
     }
