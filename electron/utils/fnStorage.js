@@ -15,6 +15,7 @@ const fnFormat_1 = require("./fnFormat");
 const storage_1 = require("./storage");
 const chunker_1 = require("../ai/chunker");
 const embeddings_1 = require("../ai/embeddings");
+const fndStorage_1 = require("./fndStorage");
 function getFnTopicsDir() {
     const userDataPath = electron_1.app?.getPath ? electron_1.app.getPath('userData') : process.cwd();
     return path_1.default.join(userDataPath, 'fn_topics');
@@ -82,6 +83,12 @@ async function saveNoteToFn(note) {
         },
     };
     await (0, fnFormat_1.writeFnFile)(fnPath, fnContent);
+    try {
+        await (0, fndStorage_1.saveNoteImagesToFnd)(note);
+    }
+    catch (fndErr) {
+        console.warn(`[fnStorage] Failed to save note images to .fnd container for '${topicId}':`, fndErr);
+    }
 }
 /**
  * Deletes the `.fn` binary container for a topic.

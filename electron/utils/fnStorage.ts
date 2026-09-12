@@ -12,6 +12,7 @@ import {
 import { getStoredNotes } from './storage';
 import { chunkNoteRecord } from '../ai/chunker';
 import { reindexTopicEmbeddings, HttpEmbeddingProvider } from '../ai/embeddings';
+import { saveNoteImagesToFnd } from './fndStorage';
 
 export function getFnTopicsDir(): string {
   const userDataPath = app?.getPath ? app.getPath('userData') : process.cwd();
@@ -87,6 +88,12 @@ export async function saveNoteToFn(note: NoteRecord): Promise<void> {
   };
 
   await writeFnFile(fnPath, fnContent);
+
+  try {
+    await saveNoteImagesToFnd(note);
+  } catch (fndErr) {
+    console.warn(`[fnStorage] Failed to save note images to .fnd container for '${topicId}':`, fndErr);
+  }
 }
 
 /**

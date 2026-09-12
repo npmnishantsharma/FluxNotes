@@ -8,6 +8,7 @@ exports.chunkNoteRecord = chunkNoteRecord;
 const crypto_1 = __importDefault(require("crypto"));
 const helpers_1 = require("../utils/helpers");
 const ocr_1 = require("./ocr");
+const markdownGenerator_1 = require("../utils/markdownGenerator");
 /**
  * Computes deterministic SHA-256 hash for chunk content.
  */
@@ -137,9 +138,17 @@ function chunkNoteRecord(note) {
                 metadata: { pageNumber: pageNum, labels: ocrAnalysis.diagramLabels },
             });
         });
+        const pageMarkdown = (0, markdownGenerator_1.generateNoteMarkdown)({
+            topicId: topicUid,
+            topicName,
+            subTopics: pageSubTopics,
+            aiResponse: rawResponseText,
+            images: pageImages.map((img) => ({ filePath: img.filePath, pageNumber: img.pageNumber })),
+        });
         const pageRecord = {
             pageNumber: pageNum,
             text: sectionContent,
+            markdown: pageMarkdown,
             headings,
             sections: [{ title: sectionTitle, content: sectionContent }],
             subTopics: pageSubTopics.map((st) => ({ names: st.names, pageNumber: st.pageNumber })),

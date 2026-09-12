@@ -97,6 +97,7 @@ export function ChatTitleBar({
               <option value="pdf">PDF</option>
               <option value="png">PNG</option>
               <option value="jpeg">JPEG</option>
+              <option value="md">Markdown (.md)</option>
             </select>
             <button
               onClick={onExportNotes}

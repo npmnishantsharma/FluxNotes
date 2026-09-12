@@ -2,6 +2,7 @@ import { ipcMain, dialog, BrowserWindow, nativeImage } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { NoteRecord, ExportNoteOptions, FailedPage } from '../types';
+import { generateNoteMarkdown } from '../utils/markdownGenerator';
 import {
   getStoredNotes,
   saveNotesCollection,
@@ -239,6 +240,26 @@ export function registerNotesIpcHandlers(
       } finally {
         if (!printWindow.isDestroyed()) printWindow.destroy();
       }
+    }
+
+    if (format === 'md') {
+      if (!mainWindow) return { success: false, error: 'Main window unavailable.' };
+      const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export notes as Markdown',
+        defaultPath: `${fileName}.md`,
+        filters: [{ name: 'Markdown document', extensions: ['md'] }],
+      });
+      if (canceled || !filePath) return { success: false, canceled: true };
+
+      const notes = await getStoredNotes();
+      const currentNote = notes.find((n) => safeFileName(n.topicName) === fileName || n.topicName === topicName) || {
+        topicName,
+        images: imagePaths.map((p, idx) => ({ filePath: p, pageNumber: idx + 1 })),
+      };
+
+      const markdownText = generateNoteMarkdown(currentNote);
+      await fs.promises.writeFile(filePath, markdownText, 'utf-8');
+      return { success: true, path: filePath, count: 1 };
     }
 
     if (format === 'png' || format === 'jpeg') {
