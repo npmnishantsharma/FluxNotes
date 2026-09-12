@@ -12,7 +12,7 @@ import {
 import { getStoredNotes } from './storage';
 import { chunkNoteRecord } from '../ai/chunker';
 import { reindexTopicEmbeddings, HttpEmbeddingProvider } from '../ai/embeddings';
-import { saveNoteImagesToFnd } from './fndStorage';
+import { saveNoteImagesToFnd, getFndFilePath } from './fndStorage';
 
 export function getFnTopicsDir(): string {
   const userDataPath = app?.getPath ? app.getPath('userData') : process.cwd();
@@ -122,12 +122,17 @@ export async function ensureAllNotesSyncedToFn(): Promise<void> {
     for (const note of notes) {
       if (!note.topicId) continue;
       const fnPath = getFnFilePath(note.topicId);
-      if (!fs.existsSync(fnPath)) {
-        console.log(`[fnStorage] Syncing existing note '${note.topicName}' (${note.topicId}) to .fn binary container...`);
+      const fndPath = getFndFilePath(note.topicId);
+
+      const needsFnSync = !fs.existsSync(fnPath);
+      const needsFndSync = !fs.existsSync(fndPath);
+
+      if (needsFnSync || needsFndSync) {
+        console.log(`[fnStorage] Syncing existing note '${note.topicName}' (${note.topicId}) into .fn / .fnd binary containers & running OCR...`);
         await saveNoteToFn(note);
       }
     }
   } catch (err) {
-    console.error('[fnStorage] Error syncing existing notes to .fn containers:', err);
+    console.error('[fnStorage] Error syncing existing notes to .fn and .fnd containers:', err);
   }
 }

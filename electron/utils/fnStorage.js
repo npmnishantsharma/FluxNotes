@@ -118,13 +118,16 @@ async function ensureAllNotesSyncedToFn() {
             if (!note.topicId)
                 continue;
             const fnPath = getFnFilePath(note.topicId);
-            if (!fs_1.default.existsSync(fnPath)) {
-                console.log(`[fnStorage] Syncing existing note '${note.topicName}' (${note.topicId}) to .fn binary container...`);
+            const fndPath = (0, fndStorage_1.getFndFilePath)(note.topicId);
+            const needsFnSync = !fs_1.default.existsSync(fnPath);
+            const needsFndSync = !fs_1.default.existsSync(fndPath);
+            if (needsFnSync || needsFndSync) {
+                console.log(`[fnStorage] Syncing existing note '${note.topicName}' (${note.topicId}) into .fn / .fnd binary containers & running OCR...`);
                 await saveNoteToFn(note);
             }
         }
     }
     catch (err) {
-        console.error('[fnStorage] Error syncing existing notes to .fn containers:', err);
+        console.error('[fnStorage] Error syncing existing notes to .fn and .fnd containers:', err);
     }
 }
