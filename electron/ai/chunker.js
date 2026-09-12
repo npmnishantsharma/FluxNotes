@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.computeChunkHash = computeChunkHash;
 exports.chunkNoteRecord = chunkNoteRecord;
 const crypto_1 = __importDefault(require("crypto"));
+const helpers_1 = require("../utils/helpers");
+const ocr_1 = require("./ocr");
 /**
  * Computes deterministic SHA-256 hash for chunk content.
  */
@@ -73,6 +75,68 @@ function chunkNoteRecord(note) {
         // Extract text sections from raw AI response or subtopics
         const sectionTitle = pageSubTopics.length > 0 ? pageSubTopics[0].names.join(', ') : `Page ${pageNum}`;
         const sectionContent = rawResponseText ? `[Topic: ${topicName}] ${rawResponseText.substring(0, 1000)}` : `Notes for ${sectionTitle}`;
+        // Perform OCR and diagram analysis on page images
+        const pageOcrBlocks = [];
+        pageImages.forEach((img, imgIdx) => {
+            const diskPath = (0, helpers_1.fromLocalImageUrl)(img.filePath);
+            const ocrAnalysis = (0, ocr_1.analyzeImageOcrAndDiagrams)(diskPath, pageNum, topicName);
+            img.ocrText = ocrAnalysis.extractedText;
+            pageOcrBlocks.push(...ocrAnalysis.ocrBlocks);
+            // Separate OCR Chunk
+            const ocrChunkId = `chunk-${topicUid}-p${pageNum}-ocr-${imgIdx}`;
+            const ocrContentHash = computeChunkHash(topicUid, pageNum, sectionTitle, 'ocr', ocrAnalysis.extractedText);
+            const ocrChunk = {
+                id: ocrChunkId,
+                topicUid,
+                pageNumber: pageNum,
+                section: sectionTitle,
+                sourceType: 'ocr',
+                text: ocrAnalysis.extractedText,
+                contentHash: ocrContentHash,
+            };
+            chunks.push(ocrChunk);
+            relationships.push({
+                id: `rel-page-ocr-${ocrChunkId}`,
+                fromId: pageId,
+                toId: ocrChunkId,
+                type: 'contains',
+                metadata: { sourceType: 'ocr' },
+            });
+            relationships.push({
+                id: `rel-ocr-img-${ocrChunkId}-${img.id}`,
+                fromId: ocrChunkId,
+                toId: img.id,
+                type: 'derived_from',
+                metadata: { pageNumber: pageNum },
+            });
+            // Separate Diagram Chunk
+            const diagramChunkId = `chunk-${topicUid}-p${pageNum}-diagram-${imgIdx}`;
+            const diagramContentHash = computeChunkHash(topicUid, pageNum, sectionTitle, 'diagram', ocrAnalysis.diagramDescription);
+            const diagramChunk = {
+                id: diagramChunkId,
+                topicUid,
+                pageNumber: pageNum,
+                section: sectionTitle,
+                sourceType: 'diagram',
+                text: ocrAnalysis.diagramDescription,
+                contentHash: diagramContentHash,
+            };
+            chunks.push(diagramChunk);
+            relationships.push({
+                id: `rel-page-diagram-${diagramChunkId}`,
+                fromId: pageId,
+                toId: diagramChunkId,
+                type: 'contains',
+                metadata: { sourceType: 'diagram' },
+            });
+            relationships.push({
+                id: `rel-diagram-img-${diagramChunkId}-${img.id}`,
+                fromId: diagramChunkId,
+                toId: img.id,
+                type: 'illustrates',
+                metadata: { pageNumber: pageNum, labels: ocrAnalysis.diagramLabels },
+            });
+        });
         const pageRecord = {
             pageNumber: pageNum,
             text: sectionContent,
@@ -81,7 +145,7 @@ function chunkNoteRecord(note) {
             subTopics: pageSubTopics.map((st) => ({ names: st.names, pageNumber: st.pageNumber })),
             tables: [],
             equations: [],
-            ocrBlocks: [],
+            ocrBlocks: pageOcrBlocks,
             images: pageImages.map((img) => ({ id: img.id, filePath: img.filePath, pageNumber: img.pageNumber })),
         };
         pages.push(pageRecord);

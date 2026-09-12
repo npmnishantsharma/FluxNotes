@@ -196,6 +196,31 @@ const SECTION_NAMES: Record<number, string> = {
 };
 
 /**
+ * Encodes data structures into hex-encoded ASCII Buffer payloads to obfuscate JSON structure.
+ */
+function encodeSectionPayload(obj: unknown): Buffer {
+  const jsonStr = JSON.stringify(obj);
+  const hexStr = Buffer.from(jsonStr, 'utf-8').toString('hex');
+  return Buffer.from(hexStr, 'ascii');
+}
+
+/**
+ * Decodes section payloads from hex-encoded ASCII Buffer back to parsed JSON object.
+ */
+function decodeSectionPayload<T>(sectionBuf: Buffer): T {
+  const rawStr = sectionBuf.toString('ascii').trim();
+  if (/^[0-9a-fA-F]+$/.test(rawStr) && rawStr.length % 2 === 0) {
+    try {
+      const jsonStr = Buffer.from(rawStr, 'hex').toString('utf-8');
+      return JSON.parse(jsonStr) as T;
+    } catch {
+      // Fallback if parsing decoded hex fails
+    }
+  }
+  return JSON.parse(sectionBuf.toString('utf-8')) as T;
+}
+
+/**
  * Serializes an FnFileContent structure into a binary Buffer.
  */
 export function serializeFn(content: FnFileContent): Buffer {
@@ -217,20 +242,16 @@ export function serializeFn(content: FnFileContent): Buffer {
   const sectionsList: { typeId: number; payload: Buffer }[] = [];
 
   // Section 1: Topic Metadata
-  const topicJsonBuf = Buffer.from(JSON.stringify(content.topic), 'utf-8');
-  sectionsList.push({ typeId: SECTION_TYPES.TOPIC_METADATA, payload: topicJsonBuf });
+  sectionsList.push({ typeId: SECTION_TYPES.TOPIC_METADATA, payload: encodeSectionPayload(content.topic) });
 
   // Section 2: Document Pages
-  const docJsonBuf = Buffer.from(JSON.stringify(content.document || { pages: [] }), 'utf-8');
-  sectionsList.push({ typeId: SECTION_TYPES.DOCUMENT_PAGES, payload: docJsonBuf });
+  sectionsList.push({ typeId: SECTION_TYPES.DOCUMENT_PAGES, payload: encodeSectionPayload(content.document || { pages: [] }) });
 
   // Section 3: Assets
-  const assetsJsonBuf = Buffer.from(JSON.stringify(content.assets || { images: [] }), 'utf-8');
-  sectionsList.push({ typeId: SECTION_TYPES.ASSETS, payload: assetsJsonBuf });
+  sectionsList.push({ typeId: SECTION_TYPES.ASSETS, payload: encodeSectionPayload(content.assets || { images: [] }) });
 
   // Section 4: Semantic Data
-  const semanticJsonBuf = Buffer.from(JSON.stringify(content.semantic || { chunks: [], relationships: [] }), 'utf-8');
-  sectionsList.push({ typeId: SECTION_TYPES.SEMANTIC_DATA, payload: semanticJsonBuf });
+  sectionsList.push({ typeId: SECTION_TYPES.SEMANTIC_DATA, payload: encodeSectionPayload(content.semantic || { chunks: [], relationships: [] }) });
 
   // Section 5: RAG Data (Embeddings metadata + Float32Array vectors)
   const rag = content.rag || { model: 'text-embedding-3-small', dimensions: 1536, modality: 'text', embeddings: [] };
@@ -256,8 +277,7 @@ export function serializeFn(content: FnFileContent): Buffer {
     modality: rag.modality,
     embeddings: embeddingsData,
   };
-  const ragJsonBuf = Buffer.from(JSON.stringify(ragMeta), 'utf-8');
-  sectionsList.push({ typeId: SECTION_TYPES.RAG_DATA, payload: ragJsonBuf });
+  sectionsList.push({ typeId: SECTION_TYPES.RAG_DATA, payload: encodeSectionPayload(ragMeta) });
 
   headerMetaBuf.writeUInt32BE(sectionsList.length, 56);
 
@@ -322,11 +342,16 @@ export function deserializeFn(buffer: Buffer): FnFileContent {
   let document = { pages: [] as FnPage[] };
   let assets = { images: [] as FnAsset[] };
   let semantic = { chunks: [] as FnChunk[], relationships: [] as FnRelationship[] };
-  let rag = {
+  let rag: {
+    model: string;
+    dimensions: number;
+    modality: 'text' | 'image' | 'multimodal';
+    embeddings: FnEmbedding[];
+  } = {
     model: 'text-embedding-3-small',
     dimensions: 1536,
-    modality: 'text' as const,
-    embeddings: [] as FnEmbedding[],
+    modality: 'text',
+    embeddings: [],
   };
 
   const indexTableOffset = 64;
@@ -341,30 +366,35 @@ export function deserializeFn(buffer: Buffer): FnFileContent {
     if (offset + length > dataSize) continue;
 
     const sectionBuf = buffer.subarray(offset, offset + length);
-    const sectionJson = sectionBuf.toString('utf-8');
 
     try {
       if (typeId === SECTION_TYPES.TOPIC_METADATA) {
-        topic = JSON.parse(sectionJson);
+        topic = decodeSectionPayload<FnTopicMetadata>(sectionBuf);
       } else if (typeId === SECTION_TYPES.DOCUMENT_PAGES) {
-        document = JSON.parse(sectionJson);
+        document = decodeSectionPayload<{ pages: FnPage[] }>(sectionBuf);
       } else if (typeId === SECTION_TYPES.ASSETS) {
-        assets = JSON.parse(sectionJson);
+        assets = decodeSectionPayload<{ images: FnAsset[] }>(sectionBuf);
       } else if (typeId === SECTION_TYPES.SEMANTIC_DATA) {
-        semantic = JSON.parse(sectionJson);
+        semantic = decodeSectionPayload<{ chunks: FnChunk[]; relationships: FnRelationship[] }>(sectionBuf);
       } else if (typeId === SECTION_TYPES.RAG_DATA) {
-        const parsedRag = JSON.parse(sectionJson);
-        const deserializedEmbeddings: FnEmbedding[] = (parsedRag.embeddings || []).map((emb: {
-          id: string;
-          chunkId: string;
-          model: string;
-          dimensions: number;
-          modality: 'text' | 'image' | 'multimodal';
-          source: { pageNumber?: number; section?: string; subTopic?: string };
-          contentHash: string;
-          vectorBase64?: string;
-          vector?: number[];
-        }) => {
+        const parsedRag = decodeSectionPayload<{
+          model?: string;
+          dimensions?: number;
+          modality?: 'text' | 'image' | 'multimodal';
+          embeddings?: Array<{
+            id: string;
+            chunkId: string;
+            model: string;
+            dimensions: number;
+            modality: 'text' | 'image' | 'multimodal';
+            source: { pageNumber?: number; section?: string; subTopic?: string };
+            contentHash: string;
+            vectorBase64?: string;
+            vector?: number[];
+          }>;
+        }>(sectionBuf);
+
+        const deserializedEmbeddings: FnEmbedding[] = (parsedRag.embeddings || []).map((emb) => {
           let vector: number[] = [];
           if (emb.vectorBase64) {
             const floatBuf = Buffer.from(emb.vectorBase64, 'base64');
