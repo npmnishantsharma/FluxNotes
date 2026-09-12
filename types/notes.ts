@@ -34,6 +34,6 @@ export type GeneratedPageImage = {
   filePath: string;
 };
 
-export type ExportFormat = 'pdf' | 'png' | 'jpeg';
+export type ExportFormat = 'pdf' | 'png' | 'jpeg' | 'md';
 
 export type AIProvider = 'chatgpt' | 'gemini';

@@ -43,7 +43,41 @@ export default function NewChatPage() {
   const [selectedImagePageNumber, setSelectedImagePageNumber] = useState<number | null>(null);
   const [noteTimestamp, setNoteTimestamp] = useState<number | null>(null);
   const [regeneratingPageNumber, setRegeneratingPageNumber] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'image' | 'markdown'>('image');
+  const [markdownCopied, setMarkdownCopied] = useState(false);
   const pageTitle = assistantData?.topicName?.trim() || 'New Chat';
+
+  const generateMarkdownPreview = useCallback(() => {
+    const title = assistantData?.topicName?.trim() || 'Untitled Notes';
+    const subTopics = assistantData?.subTopics || [];
+    let md = `# ${title}\n\n`;
+
+    if (subTopics.length > 0) {
+      md += `## Subtopics & Structure\n\n`;
+      subTopics.forEach((st) => {
+        const names = Array.isArray(st.names) ? st.names.join(', ') : String(st.names || '');
+        md += `- **Page ${st.pageNumber}**: ${names}\n`;
+      });
+      md += `\n---\n\n`;
+    }
+
+    if (pageImages.length > 0) {
+      md += `## Pages & Diagrams\n\n`;
+      pageImages.forEach((img) => {
+        const targetSubTopic = subTopics.find((st) => Number(st.pageNumber) === img.pageNumber);
+        const name = targetSubTopic ? (Array.isArray(targetSubTopic.names) ? targetSubTopic.names.join(' - ') : String(targetSubTopic.names)) : `Page ${img.pageNumber}`;
+        md += `### Page ${img.pageNumber}: ${name}\n\n`;
+        md += `#### Note Page Image\n![Page ${img.pageNumber}](${img.filePath})\n\n`;
+        md += `#### Visual Diagram Asset\n> **Diagram Schematic (Page ${img.pageNumber})**: Visual diagrams, flowcharts, and structural schematics.\n\n![Diagram Page ${img.pageNumber}](${img.filePath})\n\n`;
+      });
+    }
+
+    if (assistantData?.aiResponse) {
+      md += `## Summary & Notes\n\n${assistantData.aiResponse}\n`;
+    }
+
+    return md;
+  }, [assistantData, pageImages]);
 
   const containerEndRef = useRef<HTMLDivElement | null>(null);
   const promptInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -715,10 +749,55 @@ export default function NewChatPage() {
       />
 
       <div className="relative flex flex-1 overflow-hidden bg-black">
+        {/* Dual Mode View Toggle */}
+        {hasStartedGeneration && (
+          <div className="absolute top-3 left-4 z-20 flex items-center gap-1 rounded-lg border border-white/10 bg-slate-900/80 p-1 backdrop-blur-md">
+            <button
+              onClick={() => setViewMode('image')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition ${
+                viewMode === 'image'
+                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              📷 Image View
+            </button>
+            <button
+              onClick={() => setViewMode('markdown')}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition ${
+                viewMode === 'markdown'
+                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              📝 Markdown View
+            </button>
+          </div>
+        )}
+
         {/* Left/Center Area: Gallery View */}
         <div className="custom-scrollbar relative flex flex-1 flex-col overflow-y-auto pb-52 sm:pb-64">
-          <div className="mx-auto flex h-max w-full max-w-4xl flex-col gap-4 p-4">
-            {!hasStartedGeneration && assistantData?.status === 'new' && assistantData?.notesTheme ? (
+          <div className="mx-auto flex h-max w-full max-w-4xl flex-col gap-4 p-4 pt-12">
+            {viewMode === 'markdown' && hasStartedGeneration ? (
+              <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/80 p-6 backdrop-blur-md">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <span className="text-xs font-bold text-teal-400">MARKDOWN PREVIEW</span>
+                  <button
+                    onClick={() => {
+                      void navigator.clipboard.writeText(generateMarkdownPreview());
+                      setMarkdownCopied(true);
+                      setTimeout(() => setMarkdownCopied(false), 2000);
+                    }}
+                    className="rounded-md border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200 transition hover:bg-white/10"
+                  >
+                    {markdownCopied ? 'Copied!' : 'Copy Markdown'}
+                  </button>
+                </div>
+                <pre className="custom-scrollbar max-h-[60vh] overflow-y-auto whitespace-pre-wrap font-mono text-xs text-slate-200">
+                  {generateMarkdownPreview()}
+                </pre>
+              </div>
+            ) : !hasStartedGeneration && assistantData?.status === 'new' && assistantData?.notesTheme ? (
               <NotesThemePreview 
                 notesTheme={assistantData.notesTheme}
                 topicName={assistantData.topicName}

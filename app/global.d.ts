@@ -27,7 +27,7 @@ declare global {
       renameNote: (topicId: string, topicName: string) => Promise<{ success: boolean; error?: string }>;
       setNotePinned: (topicId: string, pinned: boolean) => Promise<{ success: boolean; error?: string }>;
       deleteNote: (topicId: string) => Promise<{ success: boolean; error?: string }>;
-      exportNote: (note: { images: string[]; topicName: string; format: 'pdf' | 'png' | 'jpeg' }) => Promise<{
+      exportNote: (note: { images: string[]; topicName: string; format: 'pdf' | 'png' | 'jpeg' | 'md' }) => Promise<{
         success: boolean;
         canceled?: boolean;
         error?: string;

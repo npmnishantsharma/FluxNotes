@@ -24,21 +24,22 @@ function registerFnInspectorIpcHandlers() {
             const fnFiles = files.filter((f) => f.endsWith('.fn'));
             const list = await Promise.all(fnFiles.map(async (fileName) => {
                 const filePath = path_1.default.join(fnDir, fileName);
+                const rawUid = fileName.slice(0, -3); // remove .fn extension
                 try {
                     const stats = await fs_1.default.promises.stat(filePath);
                     const content = await (0, fnFormat_1.readFnFile)(filePath);
                     return {
-                        uid: content.header.topicUid || content.topic.topicId,
+                        uid: rawUid || content.header?.topicUid || content.topic?.topicId || rawUid,
                         fileName,
                         filePath,
-                        topicName: content.topic.topicName || 'Untitled Topic',
+                        topicName: content.topic?.topicName || 'Untitled Topic',
                         fileSize: stats.size,
-                        updatedTimestamp: content.header.updatedTimestamp || stats.mtimeMs,
+                        updatedTimestamp: content.header?.updatedTimestamp || stats.mtimeMs,
                     };
                 }
                 catch {
                     return {
-                        uid: fileName.replace('.fn', ''),
+                        uid: rawUid,
                         fileName,
                         filePath,
                         topicName: fileName,
