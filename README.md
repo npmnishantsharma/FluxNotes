@@ -1,206 +1,264 @@
-# FluxNotes
+# ⚡ Flux Notes
 
-FluxNotes helps you turn ideas into clean, visual study notes. You type a prompt, the app builds a note structure, generates page images, and lets you save, revisit, and export everything from one place.
+### Create beautiful notes and academic projects without designing every page yourself.
 
-## For users
+Flux Notes helps you turn your content into **clean, beautifully
+designed notes and project pages**.
 
-### What the app does
-- Create a new note from the dashboard
-- Generate a study outline and page-by-page visuals
-- Save notes locally so you can come back later
-- Open previous notes and continue from where you left off
-- Export pages as PDF, PNG, or JPEG
+Whether you're making a school project, study notes, or a complete PDF,
+Flux Notes takes care of the boring formatting so you can focus on the
+actual content.
 
-### Download the app
+------------------------------------------------------------------------
 
-Choose the version for your computer:
+## ✨ What can you make?
 
-| Platform | Download type | What you get |
-| --- | --- | --- |
-| Windows | Installer | A standard Windows setup file for installing FluxNotes |
-| Linux | DEB / RPM / archive | A package for Linux users or a portable archive |
-| macOS | DMG | A macOS installer package |
+With Flux Notes, you can create things like:
 
-These are the current release formats created by the project’s Electron packaging settings.
+-   📚 **School Projects** --- Create complete, well-structured projects
+    with covers, indexes, topics, conclusions, bibliographies, and more.
+-   📝 **Study Notes** --- Turn your topics into organized, readable
+    notes.
+-   🔬 **Science Projects** --- Create projects for Physics, Chemistry,
+    Biology, and other subjects.
+-   📄 **Complete PDFs** --- Generate multi-page documents that are
+    ready to use or print.
+-   🎨 **Beautiful Pages** --- Use different layouts, themes, images,
+    and page styles to make your documents look polished.
 
-### How to use it
-1. Open the app.
-2. Click Create New Note.
-3. Type your prompt or continue a note session.
-4. Wait for the app to generate the pages.
-5. Review the pages, save your note, and export when you want.
+------------------------------------------------------------------------
 
-### Exporting notes
-You can export your generated notes as:
-- PDF
-- PNG
-- JPEG
+## 👀 See it in action
 
-### Helpful tips
-- Keep your note names simple so they are easy to find later.
-- If generation seems stuck, restart the app and try again with a fresh note.
-- Saved notes stay on your computer, so you can reopen them anytime.
+Instead of manually designing every page:
 
----
-
-## For developers
-
-### What this project is built with
-- Next.js for the interface
-- Electron for the desktop app
-- TypeScript for app logic
-- SQLite for local note storage
-- Puppeteer and browser automation for the generation flow
-
-### Main folders
-```text
-.
-├── app/              # Frontend screens and pages
-├── docker-server/    # Standalone Docker & Render server implementation
-├── electron/         # Electron app logic and worker bridge
-├── icons/            # App icons
-├── public/           # Static assets
-├── prompt.md         # Chat/AI generation instructions
-├── Changelog.md      # Release notes
-├── package.json      # App metadata and build settings
-├── README.md         # Project docs
-└── ...
+``` text
+Write content
+     ↓
+Choose your style
+     ↓
+Flux Notes
+     ↓
+Beautiful pages
+     ↓
+Complete PDF
 ```
 
-### Run it locally
-Install dependencies:
-```bash
-npm install
+You can go from an idea to a finished project without spending hours
+fixing margins, spacing, alignment, and page layouts.
+
+------------------------------------------------------------------------
+
+## 📚 Perfect for School Projects
+
+Need to make a project like:
+
+-   ⚡ AC Generator and Transformer
+-   ☢️ Nuclear Chemistry and Radioisotopes
+-   🧘 Benefits of Surya Namaskar
+-   📐 Mathematics projects
+-   🧬 Biology projects
+-   🌍 Geography projects
+-   💻 Computer Science projects
+
+Flux Notes can help structure the entire project into individual pages.
+
+For example:
+
+``` text
+My Project
+│
+├── Cover Page
+├── Certificate
+├── Acknowledgement
+├── Index
+├── Introduction
+├── Main Topics
+├── Diagrams & Images
+├── Conclusion
+└── Bibliography
 ```
 
-Start the app:
-```bash
-npm run dev
+No more making every page from scratch.
+
+------------------------------------------------------------------------
+
+## 🎨 Make Your Pages Look Good
+
+Flux Notes isn't just about putting text into a PDF.
+
+You can create pages with:
+
+-   Different layouts
+-   Custom themes
+-   Images
+-   Headings
+-   Topic numbering
+-   Structured sections
+-   Consistent formatting
+
+So your entire project can have a **consistent look from the first page
+to the last**.
+
+------------------------------------------------------------------------
+
+## 🔄 Made a Mistake?
+
+No need to rebuild the whole project.
+
+Flux Notes is designed around individual pages, which makes it possible
+to regenerate or modify a specific page when something needs to change.
+
+For example:
+
+> "Change the topic number to 8."
+
+Instead of rebuilding the entire project, you can update the affected
+page.
+
+------------------------------------------------------------------------
+
+## 🧑‍🎓 Made for Students
+
+Flux Notes is especially useful if you regularly have to create:
+
+-   School assignments
+-   Practical files
+-   Subject projects
+-   Revision notes
+-   Research projects
+-   Printable study material
+
+The goal is simple:
+
+> **Spend less time designing your project and more time working on
+> it.**
+
+------------------------------------------------------------------------
+
+## 🚀 Getting Started
+
+### Option 1 --- Use an existing project
+
+Browse the examples and start from a project that already matches what
+you need.
+
+``` text
+Examples
+   ↓
+Choose a project
+   ↓
+Change the content
+   ↓
+Generate your pages
+   ↓
+Export
 ```
 
-Expose the local mobile API through ngrok (including WebSocket upgrades):
-```bash
-export NGROK_AUTHTOKEN="your-ngrok-auth-token"
-npm run dev
+### Option 2 --- Create your own
+
+Describe the structure of your project and let Flux Notes handle the
+page generation.
+
+``` text
+Your Content
+     ↓
+Flux Notes
+     ↓
+Your Project
 ```
 
-Electron starts an authenticated local WebSocket API on `127.0.0.1:8787` and
-then starts the tunnel automatically when `NGROK_AUTHTOKEN` is available. On
-first launch, FluxNotes generates a 16-character API token and stores it in
-Electron's global user-data directory. The token is shown in Settings under
-Ngrok Tunnel. The desktop UI continues to use Next.js on port `3000`; the
-mobile client does not connect to that port.
+------------------------------------------------------------------------
 
-The public URL printed by ngrok is the mobile API endpoint. Use its `wss://`
-For the Android host setting, use the HTTPS API URL, for example
-`https://your-domain.ngrok.app/api`. The app derives the WebSocket connection
-as `wss://your-domain.ngrok.app/ws/api` automatically.
-The mobile client authenticates over that WebSocket:
+## 🖼️ Examples
 
-```json
-{"type":"auth","authToken":"the-token-shown-in-settings"}
+Here are some examples of what Flux Notes can create:
+
+> **Add screenshots of your best generated pages here.**
+
+``` text
+[ PROJECT COVER ]
+
+[ INDEX ]
+
+[ CONTENT PAGE ]
+
+[ DIAGRAM / ILLUSTRATION ]
+
+[ CONCLUSION ]
 ```
 
-The client may include its device details in the same request:
+------------------------------------------------------------------------
 
-```json
-{"type":"auth","authToken":"the-token-shown-in-settings","deviceInfo":{"deviceId":"android-123","deviceName":"Pixel","platform":"android","model":"Pixel 8","osVersion":"15","appVersion":"1.0.0","clientType":"fluxnotes-android"}}
-```
+## 💡 Why Flux Notes?
 
-The server returns `sessionId`, `token`, `renewToken`, and `mobileInfo`. The
-`mobileInfo` value contains both `serverDeviceInfo` and the sanitized
-`clientDeviceInfo`, allowing both devices to identify each other.
+Making a project normally means doing the same boring work again and
+again:
 
-Send the `sessionId` and `token` with every command:
+**Write → Format → Adjust → Fix → Repeat**
 
-```json
-{"type":"list_notes","sessionId":"...","token":"..."}
-```
+Flux Notes tries to make that process much simpler:
 
-The authentication response also includes `mobileInfo`. It can be refreshed
-after authentication with:
+**Create → Generate → Done**
 
-```json
-{"type":"get_mobile_info","sessionId":"...","token":"..."}
-```
+And because your project is structured, making changes later is much
+easier too.
 
-The equivalent explicit device-info command is
-`{"type":"get_device_info","sessionId":"...","token":"..."}`.
+------------------------------------------------------------------------
 
-Clients may send `{"type":"ping"}` periodically; the server replies with
-`{"type":"pong","timestamp":...}`. The server also sends native WebSocket
-ping frames every 30 seconds and closes unresponsive connections.
+## 🌟 Open Source
 
-Use `renewToken` with a `renew` message after the access token expires. Image
-URLs returned in notes already contain the matching session ID and token.
+Flux Notes is free and open source.
 
-To tunnel an already-running WebSocket service, use `NGROK_PORT` with the
-standalone command:
-```bash
-NGROK_PORT=8080 npm run ngrok
-```
+You can:
 
-Set `NGROK_DOMAIN` to use a reserved ngrok domain. The Settings page can also
-save a domain; when no domain is configured, ngrok uses a dynamic URL.
+-   ⭐ Star the project
+-   🐛 Report problems
+-   💡 Suggest features
+-   🎨 Create new themes
+-   📚 Share templates
+-   🔧 Contribute improvements
 
-Useful commands:
-```bash
-npm run build
-npm run build:next
-npm run build:electron
-npm run lint
-```
+Have an idea for Flux Notes?
 
-### Android app
+**Open an issue and tell us about it.**
 
-The mobile dashboard is packaged with Capacitor. Its routes are
-`/android`, `/android/dashboard`, `/android/settings`, and `/android/view`. On
-first launch, `/android` opens the native barcode scanner. Scan the QR code
-shown in desktop Settings to import a payload shaped as
-`{"host":"https://.../api","authToken":"..."}`. Host URL, host token, device
-ID, and session credentials use Capacitor Preferences; note operations use the
-authenticated WebSocket API.
+------------------------------------------------------------------------
 
-For temporary host-response debugging, responses are logged to
-Electron's global user-data `response.json` file by default. Sensitive response
-data is visible by default; restore redaction with
-`FLUXNOTES_API_RESPONSE_LOG_SENSITIVE=false`, or disable logging entirely with
-`FLUXNOTES_API_RESPONSE_LOGGING=false`.
+## 🗺️ What's Coming?
 
-Incoming HTTP requests and WebSocket messages are logged to the matching
-`request.json` file using the same settings.
+Flux Notes is still growing.
 
-```bash
-npm run build:android   # Build Next assets and sync Android
-npm run android:open    # Open the native project in Android Studio
-npm run android:run     # Build/install on a device or emulator
-```
+Some things we're working toward include:
 
-### Build details
-The app is configured to build desktop app packages for:
-- Windows: NSIS installer
-- Linux: DEB, RPM, and tar.gz
-- macOS: DMG
+-   More project templates
+-   More page designs
+-   More themes
+-   Easier project creation
+-   Better customization
+-   More automation
+-   AI-assisted project creation
+-   Community-created templates
 
-These are the actual package formats from the current Electron config in [package.json](package.json).
+------------------------------------------------------------------------
 
-### Docker & Render Server Hosting
-For hosting FluxNotes remotely (e.g. on Render or inside Docker) without running the Electron desktop UI:
-- Navigate to `docker-server/` or see [docker-server/README.md](docker-server/README.md).
-- Run `docker compose up -d` locally or deploy using the included `docker-server/render.yaml` Blueprint on Render.
-- Open the live web browser view at `http://<host>:8787/` to log into `chatgpt.com`.
-- Connect your mobile app or client to `ws://<host>:8787/ws/api` (or `wss://...`).
+## ❤️ Built to Make Project Creation Easier
 
-### Developer notes
-- The app starts the Electron shell and then launches the Next.js UI.
-- Notes and images are stored locally and loaded back into the app when reopening a note.
-- AI generation flow and browser automation live in the Electron layer.
-- The app prompt contract is defined in [prompt.md](prompt.md).
+Flux Notes started with a simple idea:
 
----
+> **Why should creating a beautiful project require so much manual
+> formatting?**
 
-## Contributing
-If you are helping with the project, keep the experience simple for users and update [Changelog.md](Changelog.md) whenever meaningful changes are made.
+You should be able to focus on **what you want to say**, not whether the
+heading is 12 pixels too far to the left.
 
-## License
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+That's what Flux Notes is trying to solve.
+
+------------------------------------------------------------------------
+
+# ⚡ Flux Notes
+
+### **Your content. Your projects. Less formatting.**
+
+⭐ If Flux Notes sounds useful, consider starring the repository and
+sharing it with someone who makes way too many school projects.
