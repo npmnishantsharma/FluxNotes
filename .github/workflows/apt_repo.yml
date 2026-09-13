@@ -36,7 +36,7 @@ jobs:
 
 
       # ============================================================
-      # IMPORT EXISTING GPG PRIVATE KEY
+      # IMPORT EXISTING GPG KEY
       # ============================================================
 
       - name: Import GPG Private Key
@@ -75,12 +75,15 @@ jobs:
           fi
 
           echo "Using release tag: $TAG"
-
           echo "TAG=$TAG" >> "$GITHUB_ENV"
 
 
       # ============================================================
       # DOWNLOAD DEB TEMPORARILY
+      #
+      # The package is already stored in the GitHub Release.
+      # We only download it temporarily so dpkg-scanpackages
+      # can inspect its metadata.
       # ============================================================
 
       - name: Download .deb from GitHub Release
@@ -115,21 +118,13 @@ jobs:
 
       - name: Generate APT Metadata
         env:
-
-          # YOUR EXISTING GPG KEY
           GPG_KEY_ID: "DD3569D42FE4D492"
-
-          # YOUR EXISTING GPG PASSPHRASE
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-          GITHUB_REPOSITORY: ${{ github.repository }}
 
         run: |
           set -e
 
-          echo "Creating APT repository structure..."
+          echo "Creating APT repository..."
 
           mkdir -p repo/pool/main
           mkdir -p repo/dists/stable/main/binary-amd64
@@ -145,9 +140,6 @@ jobs:
             -exec cp {} repo/pool/main/ \;
 
 
-          cd repo
-
-
           # ========================================================
           # GENERATE PACKAGES
           # ========================================================
@@ -155,17 +147,17 @@ jobs:
           echo "Generating Packages..."
 
           dpkg-scanpackages \
-            pool/main \
+            repo/pool/main \
             /dev/null \
-            > dists/stable/main/binary-amd64/Packages
+            > repo/dists/stable/main/binary-amd64/Packages
 
 
           # ========================================================
-          # FIND DEB FILE
+          # VERIFY DEB
           # ========================================================
 
           DEB_FILE="$(
-            find pool/main \
+            find repo/pool/main \
               -maxdepth 1 \
               -type f \
               -name "*.deb" \
@@ -174,100 +166,70 @@ jobs:
           )"
 
           if [ -z "$DEB_FILE" ]; then
-            echo "ERROR: No .deb file found."
+            echo "ERROR: No .deb package found."
             exit 1
           fi
 
-          echo "DEB file: $DEB_FILE"
+          echo "Package: $DEB_FILE"
 
 
           # ========================================================
-          # CONSTRUCT GITHUB RELEASE URL
+          # IMPORTANT:
+          #
+          # DO NOT put a GitHub URL in Filename.
+          #
+          # APT expects:
+          #
+          # Filename: pool/main/package.deb
+          #
+          # The proxy at repo.fluxnotes.nishantapps.in will handle
+          # this path and fetch the actual GitHub Release asset.
           # ========================================================
-
-          RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/${DEB_FILE}"
 
           echo ""
-          echo "Release download URL:"
-          echo "$RELEASE_URL"
+          echo "APT Filename will remain repository-relative."
 
-
-          # ========================================================
-          # UPDATE Filename FIELD
-          # ========================================================
-
-          python3 <<PY
-          import re
-          from pathlib import Path
-
-          packages_file = Path(
-              "dists/stable/main/binary-amd64/Packages"
-          )
-
-          text = packages_file.read_text()
-
-          release_url = "${RELEASE_URL}"
-
-          if not re.search(
-              r"^Filename:\s*.+$",
-              text,
-              flags=re.MULTILINE
-          ):
-              raise SystemExit(
-                  "ERROR: No Filename field found in Packages."
-              )
-
-          text = re.sub(
-              r"^Filename:\s*.+$",
-              f"Filename: {release_url}",
-              text,
-              flags=re.MULTILINE
-          )
-
-          packages_file.write_text(text)
-
-          print("")
-          print("Updated Packages:")
-          print(text)
-          PY
+          grep "^Filename:" \
+            repo/dists/stable/main/binary-amd64/Packages
 
 
           # ========================================================
           # COMPRESS PACKAGES
           # ========================================================
 
-          echo "Compressing Packages..."
+          echo ""
+          echo "Creating Packages.gz..."
 
           gzip -kf \
-            dists/stable/main/binary-amd64/Packages
+            repo/dists/stable/main/binary-amd64/Packages
 
 
           # ========================================================
-          # REMOVE DEB
+          # REMOVE DEB FROM PUBLISHED REPOSITORY
           #
-          # It remains on GitHub Releases.
+          # The package stays on GitHub Releases.
           # ========================================================
 
-          rm -rf pool
+          rm -rf repo/pool
 
 
           # ========================================================
           # GENERATE RELEASE
           # ========================================================
 
+          echo ""
           echo "Generating Release..."
 
-          apt-ftparchive release dists/stable/ \
-            > dists/stable/Release
-
-
-          cd dists/stable
+          apt-ftparchive release \
+            repo/dists/stable/ \
+            > repo/dists/stable/Release
 
 
           # ========================================================
           # CONFIGURE GPG
           # ========================================================
 
+          echo ""
           echo "Configuring GPG..."
 
           mkdir -p "$HOME/.gnupg"
@@ -289,6 +251,7 @@ jobs:
           # VERIFY EXISTING GPG KEY
           # ========================================================
 
+          echo ""
           echo "Signing with GPG key: $GPG_KEY_ID"
 
           gpg \
@@ -302,6 +265,7 @@ jobs:
           # CREATE Release.gpg
           # ========================================================
 
+          echo ""
           echo "Creating Release.gpg..."
 
           gpg \
@@ -312,14 +276,15 @@ jobs:
             --local-user "$GPG_KEY_ID" \
             --armor \
             --detach-sign \
-            --output Release.gpg \
-            Release
+            --output repo/dists/stable/Release.gpg \
+            repo/dists/stable/Release
 
 
           # ========================================================
           # CREATE InRelease
           # ========================================================
 
+          echo ""
           echo "Creating InRelease..."
 
           gpg \
@@ -329,12 +294,26 @@ jobs:
             --passphrase "$GPG_PASSPHRASE" \
             --local-user "$GPG_KEY_ID" \
             --clearsign \
-            --output InRelease \
-            Release
+            --output repo/dists/stable/InRelease \
+            repo/dists/stable/Release
+
+
+          # ========================================================
+          # CLEAN TEMPORARY FILES
+          # ========================================================
+
+          rm -rf all-dist
 
 
           echo ""
           echo "APT metadata generated successfully."
+
+          echo ""
+          echo "Final APT repository:"
+
+          find repo \
+            -type f \
+            -printf '%p\n'
 
 
       # ============================================================
@@ -345,11 +324,11 @@ jobs:
         run: |
           set -e
 
-          echo "Preparing GitHub Pages repository..."
+          echo "Preparing GitHub Pages..."
 
 
           # ========================================================
-          # SAVE ONLY REPOSITORY METADATA
+          # SAVE GENERATED REPOSITORY
           # ========================================================
 
           TEMP_REPO="$(mktemp -d)"
@@ -364,7 +343,7 @@ jobs:
           if [ -f public.key ]; then
             cp public.key "$TEMP_REPO/public.key"
           else
-            echo "WARNING: public.key not found."
+            echo "WARNING: public.key was not found."
           fi
 
 
@@ -377,10 +356,9 @@ jobs:
 
 
           # ========================================================
-          # DELETE TEMPORARY DEB
+          # CLEAN WORKING TREE
           # ========================================================
 
-          rm -rf all-dist
           rm -rf repo
 
 
@@ -396,7 +374,7 @@ jobs:
 
 
           # ========================================================
-          # COPY ONLY APT METADATA
+          # COPY APT METADATA
           # ========================================================
 
           cp -r "$TEMP_REPO"/. .
@@ -405,6 +383,26 @@ jobs:
           # ========================================================
           # SAFETY CHECK
           # ========================================================
+
+          echo ""
+          echo "Checking for Debian packages..."
+
+          if find . \
+            -type f \
+            -name "*.deb" \
+            -not -path './.git/*' \
+            | grep -q .; then
+
+            echo "ERROR: A .deb file was found in gh-pages."
+
+            find . \
+              -type f \
+              -name "*.deb" \
+              -not -path './.git/*'
+
+            exit 1
+          fi
+
 
           echo ""
           echo "Checking for files larger than 100 MB..."
@@ -417,15 +415,14 @@ jobs:
           )"
 
           if [ -n "$LARGE_FILES" ]; then
-            echo ""
-            echo "ERROR: Large files detected:"
+            echo "ERROR: Files larger than 100 MB detected:"
             echo "$LARGE_FILES"
             exit 1
           fi
 
 
           # ========================================================
-          # SHOW FILES
+          # SHOW FINAL FILES
           # ========================================================
 
           echo ""
@@ -434,7 +431,7 @@ jobs:
           find . \
             -type f \
             -not -path './.git/*' \
-            -printf '%p (%s bytes)\n'
+            -printf '%p\n'
 
 
           # ========================================================

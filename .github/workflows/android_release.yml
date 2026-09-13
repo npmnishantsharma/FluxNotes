@@ -1,18 +1,6 @@
 name: Android Build
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'android/**'
-      - '.github/workflows/android-build.yml'
-
-  pull_request:
-    paths:
-      - 'android/**'
-      - '.github/workflows/android-build.yml'
-
   workflow_dispatch:
 
 permissions:
@@ -32,7 +20,7 @@ jobs:
         working-directory: android
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -47,6 +35,11 @@ jobs:
 
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
+
+      - name: Verify APK
+        run: |
+          echo "Generated APK files:"
+          find app/build/outputs/apk -type f -name "*.apk" -print
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
